@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
+import { cache } from "react";
 
-export async function getSessionProfile(): Promise<{
+const getSessionProfileCached = cache(async (): Promise<{
   userId: string;
   profile: Profile;
-} | null> {
+} | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -29,4 +30,8 @@ export async function getSessionProfile(): Promise<{
     userId: user.id,
     profile: profile as Profile,
   };
+});
+
+export async function getSessionProfile() {
+  return getSessionProfileCached();
 }
