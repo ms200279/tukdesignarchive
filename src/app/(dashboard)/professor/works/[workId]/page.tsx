@@ -1,12 +1,33 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { WorkFileDownload } from "@/components/works/work-file-download";
+import { normalizeWorkFileRow } from "@/lib/work-files-normalize";
+import { createClient } from "@/lib/supabase/server";
 import type { Work, WorkFile } from "@/types/database";
 
 type WorkRow = Work & {
   owner: { display_name: string | null; student_id: string | null } | null;
 };
+
+type SeriesGroup = {
+  seriesId: string;
+  kind: "cover" | "original";
+  versions: WorkFile[];
+};
+
+function groupBySeries(files: WorkFile[]): SeriesGroup[] {
+  const map = new Map<string, WorkFile[]>();
+  for (const f of files) {
+    const list = map.get(f.series_id) ?? [];
+    list.push(f);
+    map.set(f.series_id, list);
+  }
+  return [...map.entries()].map(([seriesId, versions]) => {
+    const sorted = [...versions].sort((a, b) => b.version - a.version);
+    const kind = sorted[0]?.kind ?? "original";
+    return { seriesId, kind, versions: sorted };
+  });
+}
 
 export default async function ProfessorWorkDetailPage({
   params,
@@ -34,7 +55,13 @@ export default async function ProfessorWorkDetailPage({
     .eq("work_id", workId)
     .order("created_at", { ascending: true });
 
-  const files = (fileRows ?? []) as WorkFile[];
+  const files = (fileRows ?? []).map((row) =>
+    normalizeWorkFileRow(row as Record<string, unknown>),
+  );
+  const groups = groupBySeries(files);
+  const coverGroups = groups.filter((g) => g.kind === "cover");
+  const originalGroups = groups.filter((g) => g.kind === "original");
+
   const w = work as unknown as WorkRow;
 
   return (
@@ -85,15 +112,58 @@ export default async function ProfessorWorkDetailPage({
         </div>
       </div>
 
-      <div className="mt-8">
-        <h2 className="text-sm font-semibold text-slate-900">원본 파일</h2>
-        <div className="mt-3 space-y-2">
-          {files.length === 0 ? (
-            <p className="text-sm text-slate-500">첨부된 파일이 없습니다.</p>
-          ) : (
-            files.map((f) => <WorkFileDownload key={f.id} file={f} />)
-          )}
-        </div>
+      <div className="mt-8 space-y-6">
+        <section>
+          <h2 className="text-sm font-semibold text-slate-900">대표 이미지</h2>
+          <div className="mt-3 space-y-3">
+            {coverGroups.length === 0 ? (
+              <p className="text-sm text-slate-500">등록된 대표 이미지가 없습니다.</p>
+            ) : (
+              coverGroups.map((g) => (
+                <div
+                  key={g.seriesId}
+                  className="rounded-lg border border-slate-200 bg-white p-3"
+                >
+                  <p className="mb-2 text-xs text-slate-500">시리즈 (버전 {g.versions.length})</p>
+                  <ul className="space-y-2">
+                    {g.versions.map((f) => (
+                      <li key={f.id}>
+                        <WorkFileDownload file={f} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-sm font-semibold text-slate-900">원본 파일</h2>
+          <div className="mt-3 space-y-3">
+            {originalGroups.length === 0 ? (
+              <p className="text-sm text-slate-500">원본 파일이 없습니다.</p>
+            ) : (
+              originalGroups.map((g) => (
+                <div
+                  key={g.seriesId}
+                  className="rounded-lg border border-slate-200 bg-white p-3"
+                >
+                  <p className="mb-2 text-xs text-slate-500">
+                    자산 · 버전 {g.versions.length}
+                  </p>
+                  <ul className="space-y-2">
+                    {g.versions.map((f) => (
+                      <li key={f.id}>
+                        <WorkFileDownload file={f} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

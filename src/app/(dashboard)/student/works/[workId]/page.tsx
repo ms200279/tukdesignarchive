@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteWorkFile, updateWorkMetadata } from "../actions";
+import { updateWorkMetadata } from "../actions";
+import { StudentWorkFilesPanel } from "@/components/works/student-work-files-panel";
 import { getSessionProfile } from "@/lib/auth/session";
+import { normalizeWorkFileRow } from "@/lib/work-files-normalize";
 import { createClient } from "@/lib/supabase/server";
-import { WorkFileDownload } from "@/components/works/work-file-download";
-import { WorkOriginalUpload } from "@/components/works/work-original-upload";
 import type { Work, WorkFile } from "@/types/database";
 
 export default async function StudentWorkDetailPage({
@@ -39,8 +39,11 @@ export default async function StudentWorkDetailPage({
     .eq("work_id", workId)
     .order("created_at", { ascending: true });
 
-  const files = (fileRows ?? []) as WorkFile[];
-  const w = work as Work;
+  const files = (fileRows ?? []).map((row) =>
+    normalizeWorkFileRow(row as Record<string, unknown>),
+  ) as WorkFile[];
+
+  const w = work as Work & { cover_series_id?: string | null };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -63,11 +66,6 @@ export default async function StudentWorkDetailPage({
       {sp.error === "save" ? (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           저장에 실패했습니다.
-        </p>
-      ) : null}
-      {sp.error === "file" ? (
-        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          파일 처리에 실패했습니다.
         </p>
       ) : null}
 
@@ -129,32 +127,13 @@ export default async function StudentWorkDetailPage({
         </div>
       </form>
 
-      <div className="mt-8 space-y-3">
-        <h2 className="text-sm font-semibold text-slate-900">첨부 원본</h2>
-        <WorkOriginalUpload workId={w.id} userId={session.userId} />
-        <div className="space-y-2">
-          {files.length === 0 ? (
-            <p className="text-sm text-slate-500">아직 업로드된 파일이 없습니다.</p>
-          ) : (
-            files.map((f) => (
-              <div key={f.id} className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                <div className="min-w-0 flex-1">
-                  <WorkFileDownload file={f} />
-                </div>
-                <form action={deleteWorkFile} className="shrink-0">
-                  <input type="hidden" name="workId" value={w.id} />
-                  <input type="hidden" name="fileId" value={f.id} />
-                  <button
-                    type="submit"
-                    className="h-full w-full rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50 sm:w-auto"
-                  >
-                    삭제
-                  </button>
-                </form>
-              </div>
-            ))
-          )}
-        </div>
+      <div className="mt-8">
+        <StudentWorkFilesPanel
+          workId={w.id}
+          userId={session.userId}
+          initialCoverSeriesId={w.cover_series_id ?? null}
+          files={files}
+        />
       </div>
     </div>
   );

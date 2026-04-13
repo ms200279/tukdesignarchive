@@ -15,9 +15,12 @@ export type Work = {
   description: string | null;
   exhibition_year: number | null;
   metadata: Record<string, unknown>;
+  cover_series_id?: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type WorkFileKind = "cover" | "original";
 
 export type WorkFile = {
   id: string;
@@ -26,6 +29,10 @@ export type WorkFile = {
   original_name: string;
   content_type: string | null;
   byte_size: number | null;
+  kind: WorkFileKind;
+  series_id: string;
+  version: number;
+  is_latest: boolean;
   created_at: string;
 };
 

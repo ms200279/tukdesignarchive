@@ -34,6 +34,12 @@ export function WorkFileDownload({ file }: { file: WorkFile }) {
           {file.original_name}
         </div>
         <div className="text-xs text-slate-500">
+          v{"version" in file ? file.version : 1}
+          {"is_latest" in file && file.is_latest === false
+            ? " · 이전 버전"
+            : " · 최신"}
+          {"kind" in file && file.kind === "cover" ? " · 대표" : ""}
+          {" · "}
           {formatBytes(file.byte_size)}
           {file.content_type ? ` · ${file.content_type}` : ""}
         </div>

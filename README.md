@@ -7,7 +7,7 @@ TUK 디자인학과 졸업전시 아카이브 웹앱입니다. Next.js 15, TypeS
 ```bash
 npm install
 cp .env.local.example .env.local
-# .env.local에 Supabase URL·Anon Key 등을 입력합니다.
+# .env.local 에 Supabase URL·Anon Key·(마이그레이션용) DB 비밀번호를 넣습니다.
 npm run dev
 ```
 
@@ -15,7 +15,11 @@ npm run dev
 
 ## Supabase
 
-`supabase/migrations/`의 SQL을 프로젝트에 적용한 뒤 Storage 버킷·RLS가 동작하는지 확인하세요.
+1. [대시보드](https://supabase.com/dashboard)에서 **Project URL**과 **anon 키**를 `.env.local`에 넣습니다.
+2. **Project Settings → Database → Database password**를 `.env.local`에 `SUPABASE_DB_PASSWORD=...`로 추가합니다.
+3. 스키마 적용: **`npm run db:push`** (`supabase link` 없이 동작).
+
+이미 `supabase link`를 쓰는 경우: `npm run db:push:linked`
 
 ## 배포
 
