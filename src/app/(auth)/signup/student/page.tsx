@@ -33,7 +33,8 @@ export default async function StudentSignupPage({
       </div>
       <h1 className="mt-2 text-xl font-semibold text-slate-900">계정 생성</h1>
       <p className="mt-1 text-sm text-slate-600">
-        학번(숫자 10자리)으로 학생 계정을 생성합니다.
+        학번(숫자 10자리)으로 학생 계정을 생성합니다. 가입 후 학번별 학생 ID가
+        자동 발급됩니다.
       </p>
 
       {err ? (

@@ -39,3 +39,10 @@ export type WorkFile = {
 export type WorkWithOwner = Work & {
   owner: Pick<Profile, "display_name" | "student_id"> | null;
 };
+
+export type StudentRegistry = {
+  id: number;
+  profile_id: string;
+  student_id: string;
+  created_at: string;
+};

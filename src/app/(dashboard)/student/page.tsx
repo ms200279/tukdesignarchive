@@ -56,6 +56,13 @@ function formatUpdatedAt(iso: string) {
 export default async function StudentDashboardPage() {
   const session = await getSessionProfile();
   const supabase = await createClient();
+  const { data: studentRow } = session
+    ? await supabase
+        .from("student_registry")
+        .select("id")
+        .eq("profile_id", session.userId)
+        .maybeSingle()
+    : { data: null };
 
   const { data: rows, error } = await supabase
     .from("works")
@@ -73,7 +80,7 @@ export default async function StudentDashboardPage() {
           로그인 정보
         </p>
         {session ? (
-          <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+          <dl className="mt-3 grid gap-3 sm:grid-cols-4">
             <div>
               <dt className="text-xs text-slate-500">이름</dt>
               <dd className="text-sm font-medium text-slate-900">
@@ -89,6 +96,12 @@ export default async function StudentDashboardPage() {
             <div>
               <dt className="text-xs text-slate-500">역할</dt>
               <dd className="text-sm font-medium text-slate-900">학생</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-slate-500">학생 ID</dt>
+              <dd className="text-sm font-medium text-slate-900">
+                {studentRow?.id ?? "—"}
+              </dd>
             </div>
           </dl>
         ) : (
