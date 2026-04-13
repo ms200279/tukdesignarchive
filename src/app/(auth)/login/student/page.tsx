@@ -4,9 +4,10 @@ import { loginAsStudent } from "./actions";
 export default async function StudentLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; registered?: string }>;
 }) {
   const sp = await searchParams;
+  const registered = sp.registered === "1";
   const err =
     sp.error === "credentials"
       ? "학번 또는 비밀번호가 올바르지 않습니다."
@@ -30,6 +31,11 @@ export default async function StudentLoginPage({
           role="alert"
         >
           {err}
+        </p>
+      ) : null}
+      {registered ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          학생 계정이 생성되었습니다. 로그인해 주세요.
         </p>
       ) : null}
 
@@ -72,6 +78,12 @@ export default async function StudentLoginPage({
         교수이신가요?{" "}
         <Link href="/login/professor" className="font-medium text-slate-900 underline">
           교수 로그인
+        </Link>
+      </p>
+      <p className="mt-2 text-center text-sm text-slate-600">
+        학생 계정이 없나요?{" "}
+        <Link href="/signup/student" className="font-medium text-slate-900 underline">
+          학생 회원가입
         </Link>
       </p>
       <p className="mt-3 text-center text-sm">

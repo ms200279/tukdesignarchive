@@ -38,6 +38,20 @@ export default async function HomePage() {
             교수 로그인
           </Link>
         </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Link
+            href="/signup/student"
+            className="flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            학생 회원가입
+          </Link>
+          <Link
+            href="/signup/professor"
+            className="flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            교수 회원가입
+          </Link>
+        </div>
         <p className="mt-8 text-center text-xs text-slate-500">
           Supabase에 마이그레이션을 적용하고 환경 변수를 설정한 뒤 사용하세요.
         </p>
