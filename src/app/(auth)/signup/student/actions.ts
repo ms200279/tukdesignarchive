@@ -1,6 +1,7 @@
 "use server";
 
 import { isValidStudentId, normalizeStudentId, studentAuthEmail } from "@/lib/auth/student-email";
+import { signupErrorCode } from "@/lib/auth/signup-error";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -26,7 +27,7 @@ export async function signUpAsStudent(formData: FormData) {
 
   const email = studentAuthEmail(studentId);
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -39,6 +40,11 @@ export async function signUpAsStudent(formData: FormData) {
   });
 
   if (error) {
+    redirect(`/signup/student?error=${signupErrorCode(error)}`);
+  }
+
+  // confirm email 활성화 + 기존 유저일 때 error 없이 identities가 비는 케이스 처리
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
     redirect("/signup/student?error=exists");
   }
 

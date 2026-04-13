@@ -4,6 +4,7 @@ import {
   isValidProfessorSchoolEmail,
   normalizeProfessorEmail,
 } from "@/lib/auth/professor-email";
+import { signupErrorCode } from "@/lib/auth/signup-error";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -28,7 +29,7 @@ export async function signUpAsProfessor(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -40,6 +41,10 @@ export async function signUpAsProfessor(formData: FormData) {
   });
 
   if (error) {
+    redirect(`/signup/professor?error=${signupErrorCode(error)}`);
+  }
+
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
     redirect("/signup/professor?error=exists");
   }
 

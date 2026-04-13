@@ -20,6 +20,12 @@ export default async function ProfessorSignupPage({
             ? "비밀번호 확인이 일치하지 않습니다."
             : sp.error === "exists"
               ? "이미 가입된 이메일입니다."
+              : sp.error === "password_policy"
+                ? "비밀번호 정책에 맞지 않습니다. 더 안전한 비밀번호로 다시 시도해 주세요."
+                : sp.error === "server"
+                  ? "서버 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+                  : sp.error === "unknown"
+                    ? "회원가입 처리 중 알 수 없는 오류가 발생했습니다."
               : null;
 
   return (
