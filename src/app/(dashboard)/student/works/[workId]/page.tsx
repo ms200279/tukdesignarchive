@@ -1,28 +1,32 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updateWorkMetadata } from "../actions";
+import { DeleteWorkSection } from "@/components/works/delete-work-section";
 import { StudentWorkFilesPanel } from "@/components/works/student-work-files-panel";
 import { getSessionProfile } from "@/lib/auth/session";
-import { normalizeWorkFileRow } from "@/lib/work-files-normalize";
-import * as workFileRepo from "@/repositories/work-file.repository";
-import * as workRepo from "@/repositories/work.repository";
-import type { Work, WorkFile } from "@/types/domain";
+import { isStudentSession } from "@/lib/auth/role-guards";
+import { worksRepository, workFilesRepository } from "@/repositories";
+import type { Work } from "@/types/domain";
 
 export default async function StudentWorkDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ workId: string }>;
-  searchParams: Promise<{ saved?: string; error?: string }>;
+  searchParams: Promise<{
+    saved?: string;
+    error?: string;
+    message?: string;
+  }>;
 }) {
   const { workId } = await params;
   const sp = await searchParams;
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "student") {
+  if (!isStudentSession(session)) {
     notFound();
   }
 
-  const { work, error } = await workRepo.getOwnedWorkById({
+  const { work, error } = await worksRepository.getOwnedWorkById({
     ownerId: session.userId,
     workId,
   });
@@ -31,13 +35,18 @@ export default async function StudentWorkDetailPage({
     notFound();
   }
 
-  const { data: fileRows } = await workFileRepo.listFilesForWork(workId);
-
-  const files = (fileRows ?? []).map((row) =>
-    normalizeWorkFileRow(row as Record<string, unknown>),
-  ) as WorkFile[];
+  const { files } = await workFilesRepository.listFilesForWork(workId);
 
   const w = work as Work & { cover_series_id?: string | null };
+
+  let errorDetail = "";
+  if (sp.message) {
+    try {
+      errorDetail = decodeURIComponent(sp.message).slice(0, 200);
+    } catch {
+      errorDetail = sp.message.slice(0, 200);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -60,6 +69,18 @@ export default async function StudentWorkDetailPage({
       {sp.error === "save" ? (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           저장에 실패했습니다.
+        </p>
+      ) : null}
+      {sp.error === "delete" ? (
+        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          작품 레코드 삭제에 실패했습니다.
+          {errorDetail ? ` (${errorDetail})` : " 잠시 후 다시 시도해 주세요."}
+        </p>
+      ) : null}
+      {sp.error === "delete_storage" ? (
+        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          Storage 파일 삭제에 실패해 작품은 그대로 두었습니다.
+          {errorDetail ? ` (${errorDetail})` : " 네트워크·권한을 확인한 뒤 다시 시도해 주세요."}
         </p>
       ) : null}
 
@@ -128,6 +149,8 @@ export default async function StudentWorkDetailPage({
           files={files}
         />
       </div>
+
+      <DeleteWorkSection workId={w.id} workTitle={w.title} />
     </div>
   );
 }

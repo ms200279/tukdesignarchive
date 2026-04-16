@@ -20,21 +20,31 @@ export type Work = {
   updated_at: string;
 };
 
+import type { StorageAssetClass, StoredObjectRef } from "./stored-object";
+
+export type { StorageAssetClass, StoredObjectRef };
+
 export type WorkFileKind = "cover" | "original";
 
-/** DB stores object key only; bucket is implied by app config / migrations. */
+/**
+ * Normalized work file metadata (DB: work_files).
+ * `path` + `bucket` identify the object; signed URLs are derived at read time only.
+ */
 export type WorkFile = {
   id: string;
   work_id: string;
-  storage_path: string;
-  original_name: string;
-  content_type: string | null;
-  byte_size: number | null;
+  bucket: string;
+  path: string;
+  original_filename: string;
+  mime_type: string | null;
+  file_size: number | null;
+  version: number;
+  uploaded_at: string;
+  asset_class: StorageAssetClass;
+  /** Product pipeline: representative image series vs submitted originals. */
   kind: WorkFileKind;
   series_id: string;
-  version: number;
   is_latest: boolean;
-  created_at: string;
 };
 
 export type WorkWithOwner = Work & {
@@ -48,8 +58,30 @@ export type StudentRegistry = {
   created_at: string;
 };
 
-/** Logical file location for storage adapters (bucket + object key). */
-export type WorkFileStorageRef = {
-  bucket: string;
-  objectPath: string;
+/** @deprecated use `StoredObjectRef` */
+export type WorkFileStorageRef = StoredObjectRef;
+
+/** Authenticated user + app profile (provider-agnostic). */
+export type SessionWithProfile = {
+  userId: string;
+  profile: Profile;
+};
+
+/** 학생 대시보드 작품 한 줄. */
+export type StudentWorkListItem = Pick<
+  Work,
+  "id" | "title" | "description" | "exhibition_year" | "updated_at"
+>;
+
+/** 교수 목록: 작품 + 소유 학생 요약. */
+export type ProfessorWorkListItem = Pick<
+  Work,
+  "id" | "title" | "exhibition_year" | "updated_at"
+> & {
+  owner: { display_name: string | null; student_id: string | null } | null;
+};
+
+/** 교수 상세: 작품 전체 + 소유 학생. */
+export type ProfessorWorkDetail = Work & {
+  owner: { display_name: string | null; student_id: string | null } | null;
 };

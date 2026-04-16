@@ -1,14 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { WorkFileDownload } from "@/components/works/work-file-download";
-import { normalizeWorkFileRow } from "@/lib/work-files-normalize";
-import * as workFileRepo from "@/repositories/work-file.repository";
-import * as workRepo from "@/repositories/work.repository";
-import type { Work, WorkFile } from "@/types/domain";
-
-type WorkRow = Work & {
-  owner: { display_name: string | null; student_id: string | null } | null;
-};
+import { worksRepository, workFilesRepository } from "@/repositories";
+import type { WorkFile } from "@/types/domain";
 
 type SeriesGroup = {
   seriesId: string;
@@ -37,22 +31,19 @@ export default async function ProfessorWorkDetailPage({
 }) {
   const { workId } = await params;
 
-  const { work, error } = await workRepo.getWorkByIdForProfessorView(workId);
+  const { work, error } = await worksRepository.getWorkByIdForProfessorView(workId);
 
   if (error || !work) {
     notFound();
   }
 
-  const { data: fileRows } = await workFileRepo.listFilesForWork(workId);
+  const { files } = await workFilesRepository.listFilesForWork(workId);
 
-  const files = (fileRows ?? []).map((row) =>
-    normalizeWorkFileRow(row as Record<string, unknown>),
-  );
   const groups = groupBySeries(files);
   const coverGroups = groups.filter((g) => g.kind === "cover");
   const originalGroups = groups.filter((g) => g.kind === "original");
 
-  const w = work as unknown as WorkRow;
+  const w = work;
 
   return (
     <div className="mx-auto max-w-3xl">

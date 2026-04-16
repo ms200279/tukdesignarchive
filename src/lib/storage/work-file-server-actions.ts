@@ -1,25 +1,17 @@
 "use server";
 
 import { getSessionProfile } from "@/lib/auth/session";
+import { isStudentSession } from "@/lib/auth/role-guards";
 import {
   coverPreviewSignedUrlTtlSeconds,
   workFileDownloadSignedUrlTtlSeconds,
 } from "@/config/env";
-import {
-  buildLegacyFlatOriginalStoragePath,
-  buildVersionedWorkFileStoragePath,
-  sanitizeWorkFilename,
-} from "@/lib/storage/paths";
-import {
-  createSignedReadUrl,
-  removeStoragePaths,
-  uploadBytesAtPath,
-} from "@/lib/storage/supabase-work-files-storage";
-import * as workFileRepo from "@/repositories/work-file.repository";
-import * as workRepo from "@/repositories/work.repository";
+import { workFileStorage } from "@/lib/storage/storage-instances";
+import type { StoredObjectRef } from "@/types/domain";
+import { worksRepository, workFilesRepository } from "@/repositories";
 
-export async function signedUrlForWorkFileStoragePath(
-  objectPath: string,
+export async function signedUrlForWorkFileAsset(
+  ref: StoredObjectRef,
   expiresInSeconds?: number,
 ): Promise<{ signedUrl: string } | { error: string }> {
   const session = await getSessionProfile();
@@ -29,10 +21,10 @@ export async function signedUrlForWorkFileStoragePath(
 
   const ttl =
     expiresInSeconds ?? workFileDownloadSignedUrlTtlSeconds();
-  const { signedUrl, error } = await createSignedReadUrl({
-    path: objectPath,
-    expiresIn: ttl,
-  });
+  const { signedUrl, error } = await workFileStorage.createSignedReadUrl(
+    ref,
+    ttl,
+  );
   if (error || !signedUrl) {
     return { error: error ?? "signed url failed" };
   }
@@ -40,24 +32,21 @@ export async function signedUrlForWorkFileStoragePath(
 }
 
 export async function signedUrlForCoverPreview(
-  objectPath: string,
+  ref: StoredObjectRef,
 ): Promise<{ signedUrl: string } | { error: string }> {
-  return signedUrlForWorkFileStoragePath(
-    objectPath,
-    coverPreviewSignedUrlTtlSeconds(),
-  );
+  return signedUrlForWorkFileAsset(ref, coverPreviewSignedUrlTtlSeconds());
 }
 
 export async function assignCoverSeriesForWork(
   workId: string,
 ): Promise<{ seriesId: string } | { error: string }> {
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "student") {
+  if (!isStudentSession(session)) {
     return { error: "권한이 없습니다." };
   }
 
   const seriesId = crypto.randomUUID();
-  const { error } = await workRepo.updateCoverSeriesIdForOwner({
+  const { error } = await worksRepository.updateCoverSeriesIdForOwner({
     ownerId: session.userId,
     workId,
     coverSeriesId: seriesId,
@@ -75,7 +64,7 @@ export async function uploadWorkFileVersion(
   formData: FormData,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "student") {
+  if (!isStudentSession(session)) {
     return { ok: false, message: "권한이 없습니다." };
   }
 
@@ -85,28 +74,34 @@ export async function uploadWorkFileVersion(
   }
 
   const userId = session.userId;
+  const bucket = workFileStorage.defaultBucket();
+  const assetClass = workFileStorage.assetClassForPipelineKind(kind);
 
-  const bump = await workFileRepo.markSeriesVersionsNotLatest(workId, seriesId);
+  const bump = await workFilesRepository.markSeriesVersionsNotLatest(
+    workId,
+    seriesId,
+  );
   if (bump.error) {
     return { ok: false, message: bump.error };
   }
 
-  const maxVersion = await workFileRepo.getMaxVersionForSeries(seriesId);
+  const maxVersion = await workFilesRepository.getMaxVersionForSeries(seriesId);
   const nextVersion = maxVersion + 1;
-  const safe = sanitizeWorkFilename(file.name, 160);
-  const path = buildVersionedWorkFileStoragePath({
+  const path = workFileStorage.buildVersionedObjectPath({
     userId,
     workId,
     kind,
     seriesId,
     version: nextVersion,
-    safeName: safe,
+    originalFilename: file.name,
+    maxSafeNameLength: 160,
   });
 
-  const up = await uploadBytesAtPath({ path, file });
+  const ref = workFileStorage.ref(bucket, path);
+  const up = await workFileStorage.putObject(ref, file);
   if (up.error) {
     if (nextVersion > 1) {
-      await workFileRepo.restorePreviousVersionAsLatest({
+      await workFilesRepository.restorePreviousVersionAsLatest({
         workId,
         seriesId,
         previousVersion: nextVersion - 1,
@@ -115,9 +110,11 @@ export async function uploadWorkFileVersion(
     return { ok: false, message: up.error };
   }
 
-  const ins = await workFileRepo.insertWorkFileVersionRow({
+  const ins = await workFilesRepository.insertWorkFileVersionRow({
     work_id: workId,
+    storage_bucket: bucket,
     storage_path: path,
+    asset_class: assetClass,
     original_name: file.name,
     content_type: file.type || null,
     byte_size: file.size,
@@ -128,9 +125,9 @@ export async function uploadWorkFileVersion(
   });
 
   if (ins.error) {
-    await removeStoragePaths([path]);
+    await workFileStorage.deleteObjects([ref]);
     if (nextVersion > 1) {
-      await workFileRepo.restorePreviousVersionAsLatest({
+      await workFilesRepository.restorePreviousVersionAsLatest({
         workId,
         seriesId,
         previousVersion: nextVersion - 1,
@@ -147,7 +144,7 @@ export async function uploadLegacyOriginalWorkFile(
   formData: FormData,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "student") {
+  if (!isStudentSession(session)) {
     return { ok: false, message: "권한이 없습니다." };
   }
 
@@ -158,29 +155,33 @@ export async function uploadLegacyOriginalWorkFile(
 
   const userId = session.userId;
   const uniqueId = crypto.randomUUID();
-  const safe = sanitizeWorkFilename(file.name, 180);
-  const path = buildLegacyFlatOriginalStoragePath({
+  const bucket = workFileStorage.defaultBucket();
+  const path = workFileStorage.buildLegacyOriginalObjectPath({
     userId,
     workId,
     uniqueId,
-    safeName: safe,
+    originalFilename: file.name,
+    maxSafeNameLength: 180,
   });
 
-  const up = await uploadBytesAtPath({ path, file });
+  const ref = workFileStorage.ref(bucket, path);
+  const up = await workFileStorage.putObject(ref, file);
   if (up.error) {
     return { ok: false, message: up.error };
   }
 
-  const ins = await workFileRepo.insertLegacyOriginalRow({
+  const ins = await workFilesRepository.insertLegacyOriginalRow({
     work_id: workId,
+    storage_bucket: bucket,
     storage_path: path,
+    asset_class: "original",
     original_name: file.name,
     content_type: file.type || null,
     byte_size: file.size,
   });
 
   if (ins.error) {
-    await removeStoragePaths([path]);
+    await workFileStorage.deleteObjects([ref]);
     return { ok: false, message: ins.error };
   }
 

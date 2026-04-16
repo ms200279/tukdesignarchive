@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
+import { isStudentSession } from "@/lib/auth/role-guards";
 
 export default async function StudentSectionLayout({
   children,
@@ -10,7 +11,7 @@ export default async function StudentSectionLayout({
   if (!session) {
     redirect("/");
   }
-  if (session.profile.role !== "student") {
+  if (!isStudentSession(session)) {
     redirect("/professor");
   }
   return children;

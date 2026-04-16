@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signedUrlForWorkFileStoragePath } from "@/lib/storage/work-file-server-actions";
+import { signedUrlForWorkFileAsset } from "@/lib/storage/work-file-server-actions";
 import type { WorkFile } from "@/types/domain";
 
 function formatBytes(n: number | null) {
@@ -16,7 +16,10 @@ export function WorkFileDownload({ file }: { file: WorkFile }) {
 
   async function openSigned() {
     setBusy(true);
-    const res = await signedUrlForWorkFileStoragePath(file.storage_path);
+    const res = await signedUrlForWorkFileAsset({
+      bucket: file.bucket,
+      path: file.path,
+    });
     setBusy(false);
     if ("error" in res) return;
     window.open(res.signedUrl, "_blank", "noopener,noreferrer");
@@ -26,17 +29,15 @@ export function WorkFileDownload({ file }: { file: WorkFile }) {
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
       <div className="min-w-0">
         <div className="truncate font-medium text-slate-800">
-          {file.original_name}
+          {file.original_filename}
         </div>
         <div className="text-xs text-slate-500">
-          v{"version" in file ? file.version : 1}
-          {"is_latest" in file && file.is_latest === false
-            ? " · 이전 버전"
-            : " · 최신"}
-          {"kind" in file && file.kind === "cover" ? " · 대표" : ""}
+          v{file.version}
+          {file.is_latest === false ? " · 이전 버전" : " · 최신"}
+          {file.kind === "cover" ? " · 대표" : ""}
           {" · "}
-          {formatBytes(file.byte_size)}
-          {file.content_type ? ` · ${file.content_type}` : ""}
+          {formatBytes(file.file_size)}
+          {file.mime_type ? ` · ${file.mime_type}` : ""}
         </div>
       </div>
       <button

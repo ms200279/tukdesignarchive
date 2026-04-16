@@ -5,7 +5,7 @@ import {
   normalizeProfessorEmail,
 } from "@/lib/auth/professor-email";
 import { signupErrorCode } from "@/lib/auth/signup-error";
-import { signUpWithEmail } from "@/lib/auth/supabase-server-auth";
+import { credentialsAuth } from "@/lib/auth/auth-instances";
 import { redirect } from "next/navigation";
 
 export async function signUpAsProfessor(formData: FormData) {
@@ -28,7 +28,7 @@ export async function signUpAsProfessor(formData: FormData) {
     redirect("/signup/professor?error=password_confirm");
   }
 
-  const { data, error } = await signUpWithEmail({
+  const result = await credentialsAuth.signUpWithMetadata({
     email,
     password,
     metadata: {
@@ -37,15 +37,11 @@ export async function signUpAsProfessor(formData: FormData) {
     },
   });
 
-  if (error) {
-    redirect(`/signup/professor?error=${signupErrorCode(error)}`);
+  if (!result.ok) {
+    redirect(`/signup/professor?error=${signupErrorCode(result.error)}`);
   }
 
-  if (
-    data.user &&
-    Array.isArray(data.user.identities) &&
-    data.user.identities.length === 0
-  ) {
+  if (result.identitiesCount === 0) {
     redirect("/signup/professor?error=exists");
   }
 

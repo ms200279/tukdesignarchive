@@ -1,18 +1,11 @@
 import Link from "next/link";
-import * as workRepo from "@/repositories/work.repository";
-import type { Work } from "@/types/domain";
-
-type Row = Pick<
-  Work,
-  "id" | "title" | "exhibition_year" | "updated_at"
-> & {
-  owner: { display_name: string | null; student_id: string | null } | null;
-};
+import { worksRepository } from "@/repositories";
+import type { ProfessorWorkListItem } from "@/types/domain";
 
 export default async function ProfessorDashboardPage() {
-  const { rows, error } = await workRepo.listWorksForProfessor();
+  const { rows, error } = await worksRepository.listWorksForProfessor();
 
-  const works = rows as unknown as Row[];
+  const works: ProfessorWorkListItem[] = rows;
 
   return (
     <div className="mx-auto max-w-6xl">

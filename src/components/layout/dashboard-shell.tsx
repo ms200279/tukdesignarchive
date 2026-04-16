@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
+import { profileHasRole } from "@/lib/auth/role-guards";
 import type { Profile } from "@/types/domain";
 
 const navStudent = [
@@ -16,11 +17,10 @@ export function DashboardShell({
   profile: Profile;
   children: React.ReactNode;
 }) {
-  const nav = profile.role === "student" ? navStudent : navProfessor;
-  const badge =
-    profile.role === "student"
-      ? `학생 · ${profile.student_id ?? "학번 미등록"}`
-      : "교수";
+  const nav = profileHasRole(profile, "student") ? navStudent : navProfessor;
+  const badge = profileHasRole(profile, "student")
+    ? `학생 · ${profile.student_id ?? "학번 미등록"}`
+    : "교수";
 
   return (
     <div className="flex min-h-full bg-slate-50 text-slate-900">

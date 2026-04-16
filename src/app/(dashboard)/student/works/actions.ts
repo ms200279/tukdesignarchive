@@ -1,17 +1,19 @@
 "use server";
 
 import { getSessionProfile } from "@/lib/auth/session";
+import { isStudentSession } from "@/lib/auth/role-guards";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import * as workRepo from "@/repositories/work.repository";
+import { workFileStorage } from "@/lib/storage/storage-instances";
+import { worksRepository, workFilesRepository } from "@/repositories";
 
 export async function createWork() {
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "student") {
+  if (!isStudentSession(session)) {
     redirect("/login/student");
   }
 
-  const result = await workRepo.insertWorkForOwner({
+  const result = await worksRepository.insertWorkForOwner({
     ownerId: session.userId,
     title: "새 작품",
   });
@@ -31,12 +33,12 @@ export async function updateWorkMetadata(formData: FormData) {
   const yearRaw = String(formData.get("exhibition_year") ?? "").trim();
 
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "student" || !workId) {
+  if (!isStudentSession(session) || !workId) {
     redirect("/student");
   }
 
   const exhibition_year = yearRaw ? Number.parseInt(yearRaw, 10) : null;
-  const { error } = await workRepo.updateWorkMetadataForOwner({
+  const { error } = await worksRepository.updateWorkMetadataForOwner({
     ownerId: session.userId,
     workId,
     title: title || "제목 없음",
@@ -54,4 +56,43 @@ export async function updateWorkMetadata(formData: FormData) {
   revalidatePath("/student");
   revalidatePath(`/student/works/${workId}`);
   redirect(`/student/works/${workId}?saved=1`);
+}
+
+export async function deleteWork(formData: FormData) {
+  const workId = String(formData.get("workId") ?? "").trim();
+
+  const session = await getSessionProfile();
+  if (!isStudentSession(session) || !workId) {
+    redirect("/student?error=delete");
+  }
+
+  const { work, error: loadErr } = await worksRepository.getOwnedWorkById({
+    ownerId: session.userId,
+    workId,
+  });
+  if (loadErr || !work) {
+    redirect("/student?error=delete");
+  }
+
+  const refs = await workFilesRepository.listObjectRefsForWork(workId);
+  const storageResult = await workFileStorage.deleteObjects(refs);
+  if (storageResult.error) {
+    redirect(
+      `/student/works/${workId}?error=delete_storage&message=${encodeURIComponent(storageResult.error)}`,
+    );
+  }
+
+  const { error: delErr } = await worksRepository.deleteWorkForOwner({
+    ownerId: session.userId,
+    workId,
+  });
+  if (delErr) {
+    redirect(
+      `/student/works/${workId}?error=delete&message=${encodeURIComponent(delErr)}`,
+    );
+  }
+
+  revalidatePath("/student");
+  revalidatePath(`/student/works/${workId}`);
+  redirect("/student?deleted=1");
 }

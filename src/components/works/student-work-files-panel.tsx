@@ -13,7 +13,7 @@ import {
   signedUrlForCoverPreview,
   uploadWorkFileVersion,
 } from "@/lib/storage/work-file-server-actions";
-import type { WorkFile } from "@/types/domain";
+import type { StoredObjectRef, WorkFile } from "@/types/domain";
 import { WorkFileDownload } from "@/components/works/work-file-download";
 
 export type FileSeriesGroup = {
@@ -36,14 +36,14 @@ function groupFiles(files: WorkFile[]): FileSeriesGroup[] {
   });
 }
 
-function CoverPreview({ storagePath: path }: { storagePath: string }) {
+function CoverPreview({ objectRef }: { objectRef: StoredObjectRef }) {
   const [url, setUrl] = useState<string | null>(null);
   const [err, setErr] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const res = await signedUrlForCoverPreview(path);
+      const res = await signedUrlForCoverPreview(objectRef);
       if (cancelled) return;
       if ("error" in res) setErr(true);
       else setUrl(res.signedUrl);
@@ -51,7 +51,8 @@ function CoverPreview({ storagePath: path }: { storagePath: string }) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bucket+path로 동일 객체 식별
+  }, [objectRef.bucket, objectRef.path]);
 
   if (err) {
     return (
@@ -223,7 +224,9 @@ export function StudentWorkFilesPanel({
         {latestCover ? (
           <div className="mt-4 space-y-3">
             <p className="text-xs font-medium text-slate-500">현재 대표</p>
-            <CoverPreview storagePath={latestCover.storage_path} />
+            <CoverPreview
+              objectRef={{ bucket: latestCover.bucket, path: latestCover.path }}
+            />
             {primaryCoverGroup && primaryCoverGroup.versions.length > 1 ? (
               <details className="rounded-md border border-slate-100 bg-slate-50/80 p-3 text-sm">
                 <summary className="cursor-pointer text-slate-600">

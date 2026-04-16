@@ -6,7 +6,7 @@ import {
   studentAuthEmail,
 } from "@/lib/auth/student-email";
 import { signupErrorCode } from "@/lib/auth/signup-error";
-import { signUpWithEmail } from "@/lib/auth/supabase-server-auth";
+import { credentialsAuth } from "@/lib/auth/auth-instances";
 import { redirect } from "next/navigation";
 
 export async function signUpAsStudent(formData: FormData) {
@@ -30,7 +30,7 @@ export async function signUpAsStudent(formData: FormData) {
   }
 
   const email = studentAuthEmail(studentId);
-  const { data, error } = await signUpWithEmail({
+  const result = await credentialsAuth.signUpWithMetadata({
     email,
     password,
     metadata: {
@@ -40,15 +40,11 @@ export async function signUpAsStudent(formData: FormData) {
     },
   });
 
-  if (error) {
-    redirect(`/signup/student?error=${signupErrorCode(error)}`);
+  if (!result.ok) {
+    redirect(`/signup/student?error=${signupErrorCode(result.error)}`);
   }
 
-  if (
-    data.user &&
-    Array.isArray(data.user.identities) &&
-    data.user.identities.length === 0
-  ) {
+  if (result.identitiesCount === 0) {
     redirect("/signup/student?error=exists");
   }
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { signInWithPassword } from "@/lib/auth/supabase-server-auth";
+import { credentialsAuth } from "@/lib/auth/auth-instances";
 import { redirect } from "next/navigation";
 
 export async function loginAsProfessor(formData: FormData) {
@@ -11,9 +11,9 @@ export async function loginAsProfessor(formData: FormData) {
     redirect("/login/professor?error=invalid");
   }
 
-  const { error } = await signInWithPassword({ email, password });
+  const result = await credentialsAuth.signInWithPassword({ email, password });
 
-  if (error) {
+  if (!result.ok) {
     redirect("/login/professor?error=credentials");
   }
 

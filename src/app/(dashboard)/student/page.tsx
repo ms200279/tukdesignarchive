@@ -2,17 +2,12 @@ import Link from "next/link";
 import { WorkStatusBadge } from "@/components/student/work-status-badge";
 import { getSessionProfile } from "@/lib/auth/session";
 import { deriveWorkStatus } from "@/lib/student/work-status";
-import * as workFileRepo from "@/repositories/work-file.repository";
-import * as workRepo from "@/repositories/work.repository";
-import * as studentRegistryRepo from "@/repositories/student-registry.repository";
-
-type WorkRow = {
-  id: string;
-  title: string;
-  description: string | null;
-  exhibition_year: number | null;
-  updated_at: string;
-};
+import {
+  usersRepository,
+  worksRepository,
+  workFilesRepository,
+} from "@/repositories";
+import type { StudentWorkListItem } from "@/types/domain";
 
 function formatUpdatedAt(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -24,19 +19,25 @@ function formatUpdatedAt(iso: string) {
   });
 }
 
-export default async function StudentDashboardPage() {
+export default async function StudentDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string; error?: string }>;
+}) {
+  const sp = await searchParams;
   const session = await getSessionProfile();
   const studentRegistryId = session
-    ? await studentRegistryRepo.findRegistryIdByProfileId(session.userId)
+    ? await usersRepository.findStudentRegistryIdByProfileId(session.userId)
     : null;
 
   const { rows, error: listError } = session
-    ? await workRepo.listWorksForOwner(session.userId)
+    ? await worksRepository.listWorksForOwner(session.userId)
     : { rows: [], error: null };
 
-  const works = rows as WorkRow[];
+  const works: StudentWorkListItem[] = rows;
   const workIds = works.map((w) => w.id);
-  const fileCountMap = await workFileRepo.countLatestFilesByWorkIds(workIds);
+  const fileCountMap =
+    await workFilesRepository.countLatestFilesByWorkIds(workIds);
   const error = listError;
 
   return (
@@ -92,6 +93,19 @@ export default async function StudentDashboardPage() {
         </Link>
       </div>
 
+      {sp.deleted === "1" ? (
+        <p
+          className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          role="status"
+        >
+          작품이 삭제되었습니다.
+        </p>
+      ) : null}
+      {sp.error === "delete" ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          작품을 삭제하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.
+        </p>
+      ) : null}
       {error ? (
         <p className="text-sm text-red-600" role="alert">
           목록을 불러오지 못했습니다. Supabase 연결과 RLS를 확인해 주세요.
