@@ -35,7 +35,8 @@ export default async function StudentWorkDetailPage({
     notFound();
   }
 
-  const { files } = await workFilesRepository.listFilesForWork(workId);
+  const { files, error: filesError } =
+    await workFilesRepository.listFilesForWork(workId);
 
   const w = work as Work & { cover_series_id?: string | null };
 
@@ -81,6 +82,18 @@ export default async function StudentWorkDetailPage({
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           Storage 파일 삭제에 실패해 작품은 그대로 두었습니다.
           {errorDetail ? ` (${errorDetail})` : " 네트워크·권한을 확인한 뒤 다시 시도해 주세요."}
+        </p>
+      ) : null}
+      {sp.error === "delete_list" ? (
+        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          파일 목록을 불러오지 못해 삭제를 중단했습니다. (DB·RLS·네트워크를 확인해 주세요)
+          {errorDetail ? ` (${errorDetail})` : ""}
+        </p>
+      ) : null}
+      {filesError ? (
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          첨부 파일 목록을 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해 주세요. (
+          {filesError})
         </p>
       ) : null}
 
@@ -146,7 +159,7 @@ export default async function StudentWorkDetailPage({
         <StudentWorkFilesPanel
           workId={w.id}
           initialCoverSeriesId={w.cover_series_id ?? null}
-          files={files}
+          files={filesError ? [] : files}
         />
       </div>
 

@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
-import { getPublicSupabaseAnonKey, getPublicSupabaseUrl } from "@/config/env";
+import { getPublicSupabaseAnonKey, getPublicSupabaseUrl } from "@/config";
 
 type CookieToSet = {
   name: string;

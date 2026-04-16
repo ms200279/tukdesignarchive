@@ -1,4 +1,4 @@
-import { getPublicSupabaseAnonKey, getPublicSupabaseUrl } from "@/config/env";
+import { getPublicSupabaseAnonKey, getPublicSupabaseUrl } from "@/config";
 import { refreshAuthSessionFromRequest } from "@/lib/db/update-session";
 import { type NextRequest, NextResponse } from "next/server";
 

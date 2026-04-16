@@ -6,4 +6,4 @@ export {
   studentEmailDomain,
   workFilesBucket as WORK_FILES_BUCKET,
   workFilesBucket,
-} from "@/config/env";
+} from "@/config";

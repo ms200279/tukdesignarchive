@@ -1,3 +1,4 @@
+import { workFilesBucket } from "@/config";
 import { createServerSupabaseClient } from "@/lib/db/server";
 import { normalizeWorkFileRow } from "@/lib/work-files-normalize";
 import type { WorkFilesRepository } from "@/repositories/ports/work-files-repository.port";
@@ -23,20 +24,41 @@ export class SupabaseWorkFilesRepository implements WorkFilesRepository {
     return { files, error: null };
   }
 
-  async listObjectRefsForWork(workId: string): Promise<StoredObjectRef[]> {
+  async listObjectRefsForWork(
+    workId: string,
+  ): Promise<{ refs: StoredObjectRef[]; error: string | null }> {
     const db = await createServerSupabaseClient();
     const { data, error } = await db
       .from("work_files")
       .select("storage_bucket, storage_path")
       .eq("work_id", workId);
 
-    if (error || !data) {
-      return [];
+    if (error) {
+      return { refs: [], error: error.message };
     }
-    return data.map((r) => ({
-      bucket: String((r as { storage_bucket?: string }).storage_bucket),
-      path: String((r as { storage_path?: string }).storage_path),
-    }));
+    if (!data) {
+      return { refs: [], error: null };
+    }
+
+    const defaultBucket = workFilesBucket();
+
+    const refs: StoredObjectRef[] = [];
+    for (const row of data) {
+      const r = row as { storage_bucket?: string | null; storage_path?: string | null };
+      const rawPath = r.storage_path;
+      const path =
+        typeof rawPath === "string" ? rawPath.trim() : String(rawPath ?? "").trim();
+      if (!path) continue;
+
+      const rawBucket = r.storage_bucket;
+      const bucket =
+        typeof rawBucket === "string" && rawBucket.trim().length > 0
+          ? rawBucket.trim()
+          : defaultBucket;
+
+      refs.push({ bucket, path });
+    }
+    return { refs, error: null };
   }
 
   async markSeriesVersionsNotLatest(

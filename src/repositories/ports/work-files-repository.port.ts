@@ -5,7 +5,9 @@ export interface WorkFilesRepository {
     workId: string,
   ): Promise<{ files: WorkFile[]; error: string | null }>;
 
-  listObjectRefsForWork(workId: string): Promise<StoredObjectRef[]>;
+  listObjectRefsForWork(
+    workId: string,
+  ): Promise<{ refs: StoredObjectRef[]; error: string | null }>;
 
   markSeriesVersionsNotLatest(
     workId: string,

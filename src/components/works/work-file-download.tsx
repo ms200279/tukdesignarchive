@@ -13,15 +13,20 @@ function formatBytes(n: number | null) {
 
 export function WorkFileDownload({ file }: { file: WorkFile }) {
   const [busy, setBusy] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
 
   async function openSigned() {
+    setOpenError(null);
     setBusy(true);
     const res = await signedUrlForWorkFileAsset({
       bucket: file.bucket,
       path: file.path,
     });
     setBusy(false);
-    if ("error" in res) return;
+    if ("error" in res) {
+      setOpenError(res.error);
+      return;
+    }
     window.open(res.signedUrl, "_blank", "noopener,noreferrer");
   }
 
@@ -40,14 +45,21 @@ export function WorkFileDownload({ file }: { file: WorkFile }) {
           {file.mime_type ? ` · ${file.mime_type}` : ""}
         </div>
       </div>
-      <button
-        type="button"
-        onClick={() => void openSigned()}
-        disabled={busy}
-        className="shrink-0 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-      >
-        {busy ? "열기…" : "원본 열기"}
-      </button>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <button
+          type="button"
+          onClick={() => void openSigned()}
+          disabled={busy}
+          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {busy ? "열기…" : "원본 열기"}
+        </button>
+        {openError ? (
+          <p className="max-w-[12rem] text-right text-xs text-red-600" role="alert">
+            {openError}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

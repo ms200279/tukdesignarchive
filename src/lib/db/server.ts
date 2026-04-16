@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { getPublicSupabaseAnonKey, getPublicSupabaseUrl } from "@/config/env";
+import { requirePublicSupabaseClientConfig } from "@/config";
 
 type CookieToSet = {
   name: string;
@@ -10,15 +10,11 @@ type CookieToSet = {
 
 /** Server / Server Action Supabase client (cookies + RLS). */
 export async function createServerSupabaseClient() {
-  const url = getPublicSupabaseUrl();
-  const anon = getPublicSupabaseAnonKey();
-  if (!url || !anon) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY 가 설정되지 않았습니다.");
-  }
+  const { supabaseUrl, supabaseAnonKey } = requirePublicSupabaseClientConfig();
 
   const cookieStore = await cookies();
 
-  return createServerClient(url, anon, {
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

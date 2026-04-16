@@ -74,7 +74,14 @@ export async function deleteWork(formData: FormData) {
     redirect("/student?error=delete");
   }
 
-  const refs = await workFilesRepository.listObjectRefsForWork(workId);
+  const { refs, error: refsErr } =
+    await workFilesRepository.listObjectRefsForWork(workId);
+  if (refsErr) {
+    redirect(
+      `/student/works/${workId}?error=delete_list&message=${encodeURIComponent(refsErr)}`,
+    );
+  }
+
   const storageResult = await workFileStorage.deleteObjects(refs);
   if (storageResult.error) {
     redirect(

@@ -124,7 +124,7 @@ export class SupabaseWorksRepository implements WorksRepository {
     exhibition_year: number | null;
   }): Promise<{ error: string | null }> {
     const db = await createServerSupabaseClient();
-    const { error } = await db
+    const { data, error } = await db
       .from("works")
       .update({
         title: params.title,
@@ -132,9 +132,18 @@ export class SupabaseWorksRepository implements WorksRepository {
         exhibition_year: params.exhibition_year,
       })
       .eq("id", params.workId)
-      .eq("owner_id", params.ownerId);
+      .eq("owner_id", params.ownerId)
+      .select("id");
 
-    return { error: error?.message ?? null };
+    if (error) {
+      return { error: error.message };
+    }
+    if (!data?.length) {
+      return {
+        error: "작품을 찾을 수 없거나 저장 권한이 없습니다.",
+      };
+    }
+    return { error: null };
   }
 
   async updateCoverSeriesIdForOwner(params: {
@@ -143,13 +152,22 @@ export class SupabaseWorksRepository implements WorksRepository {
     coverSeriesId: string;
   }): Promise<{ error: string | null }> {
     const db = await createServerSupabaseClient();
-    const { error } = await db
+    const { data, error } = await db
       .from("works")
       .update({ cover_series_id: params.coverSeriesId })
       .eq("id", params.workId)
-      .eq("owner_id", params.ownerId);
+      .eq("owner_id", params.ownerId)
+      .select("id");
 
-    return { error: error?.message ?? null };
+    if (error) {
+      return { error: error.message };
+    }
+    if (!data?.length) {
+      return {
+        error: "작품을 찾을 수 없거나 권한이 없습니다.",
+      };
+    }
+    return { error: null };
   }
 
   async getOwnedWorkById(params: {
@@ -230,12 +248,21 @@ export class SupabaseWorksRepository implements WorksRepository {
     workId: string;
   }): Promise<{ error: string | null }> {
     const db = await createServerSupabaseClient();
-    const { error } = await db
+    const { data, error } = await db
       .from("works")
       .delete()
       .eq("id", params.workId)
-      .eq("owner_id", params.ownerId);
+      .eq("owner_id", params.ownerId)
+      .select("id");
 
-    return { error: error?.message ?? null };
+    if (error) {
+      return { error: error.message };
+    }
+    if (!data?.length) {
+      return {
+        error: "작품을 찾을 수 없거나 삭제 권한이 없습니다.",
+      };
+    }
+    return { error: null };
   }
 }

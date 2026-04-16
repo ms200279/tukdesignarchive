@@ -1,4 +1,4 @@
-import { workFilesBucket } from "@/config/env";
+import { workFilesBucket } from "@/config";
 import type { StorageAssetClass, WorkFile, WorkFileKind } from "@/types/domain";
 
 function coerceAssetClass(

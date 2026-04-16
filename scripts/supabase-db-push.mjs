@@ -2,6 +2,8 @@
 /**
  * supabase link 없이 DB 연결 문자열로 마이그레이션만 푸시합니다.
  *
+ * 변수 설명: 프로젝트 루트 `.env.example` 참고 (공개 vs 서버 전용 구분).
+ *
  * .env.local 에 다음 중 하나:
  *   SUPABASE_DB_PASSWORD=...  (자동으로 direct URI 구성)
  * 또는

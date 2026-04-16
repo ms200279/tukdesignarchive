@@ -1,4 +1,4 @@
-import { workFilesBucket } from "@/config/env";
+import { workFilesBucket } from "@/config";
 import type { ObjectStoragePort } from "@/lib/storage/ports/object-storage.port";
 import {
   buildLegacyFlatOriginalStoragePath,

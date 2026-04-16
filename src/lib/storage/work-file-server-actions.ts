@@ -5,7 +5,7 @@ import { isStudentSession } from "@/lib/auth/role-guards";
 import {
   coverPreviewSignedUrlTtlSeconds,
   workFileDownloadSignedUrlTtlSeconds,
-} from "@/config/env";
+} from "@/config";
 import { workFileStorage } from "@/lib/storage/storage-instances";
 import type { StoredObjectRef } from "@/types/domain";
 import { worksRepository, workFilesRepository } from "@/repositories";
