@@ -1,35 +1,23 @@
-import { createClient } from "@/lib/supabase/server";
-import type { Profile } from "@/types/database";
+import { getAuthUserId } from "@/lib/auth/supabase-server-auth";
+import { getProfileByUserId } from "@/repositories/profile.repository";
+import type { Profile } from "@/types/domain";
 import { cache } from "react";
 
 const getSessionProfileCached = cache(async (): Promise<{
   userId: string;
   profile: Profile;
 } | null> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
+  const userId = await getAuthUserId();
+  if (!userId) {
     return null;
   }
 
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (error || !profile) {
+  const profile = await getProfileByUserId(userId);
+  if (!profile) {
     return null;
   }
 
-  return {
-    userId: user.id,
-    profile: profile as Profile,
-  };
+  return { userId, profile };
 });
 
 export async function getSessionProfile() {

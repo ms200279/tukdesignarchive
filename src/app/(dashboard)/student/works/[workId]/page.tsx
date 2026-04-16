@@ -4,8 +4,9 @@ import { updateWorkMetadata } from "../actions";
 import { StudentWorkFilesPanel } from "@/components/works/student-work-files-panel";
 import { getSessionProfile } from "@/lib/auth/session";
 import { normalizeWorkFileRow } from "@/lib/work-files-normalize";
-import { createClient } from "@/lib/supabase/server";
-import type { Work, WorkFile } from "@/types/database";
+import * as workFileRepo from "@/repositories/work-file.repository";
+import * as workRepo from "@/repositories/work.repository";
+import type { Work, WorkFile } from "@/types/domain";
 
 export default async function StudentWorkDetailPage({
   params,
@@ -21,23 +22,16 @@ export default async function StudentWorkDetailPage({
     notFound();
   }
 
-  const supabase = await createClient();
-  const { data: work, error } = await supabase
-    .from("works")
-    .select("*")
-    .eq("id", workId)
-    .eq("owner_id", session.userId)
-    .maybeSingle();
+  const { work, error } = await workRepo.getOwnedWorkById({
+    ownerId: session.userId,
+    workId,
+  });
 
   if (error || !work) {
     notFound();
   }
 
-  const { data: fileRows } = await supabase
-    .from("work_files")
-    .select("*")
-    .eq("work_id", workId)
-    .order("created_at", { ascending: true });
+  const { data: fileRows } = await workFileRepo.listFilesForWork(workId);
 
   const files = (fileRows ?? []).map((row) =>
     normalizeWorkFileRow(row as Record<string, unknown>),
@@ -130,7 +124,6 @@ export default async function StudentWorkDetailPage({
       <div className="mt-8">
         <StudentWorkFilesPanel
           workId={w.id}
-          userId={session.userId}
           initialCoverSeriesId={w.cover_series_id ?? null}
           files={files}
         />

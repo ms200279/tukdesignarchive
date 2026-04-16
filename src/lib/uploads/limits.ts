@@ -1,8 +1,9 @@
 /** 대표 이미지: 이미지 MIME만, 최대 용량 */
-export const COVER_MAX_BYTES = 5 * 1024 * 1024;
+export const COVER_MAX_BYTES = 100 * 1024 * 1024;
 
 /** 원본: 허용 목록 기준, 최대 용량 */
 export const ORIGINAL_MAX_BYTES = 100 * 1024 * 1024;
+export const BATCH_MAX_BYTES = 500 * 1024 * 1024;
 
 const COVER_PREFIXES = ["image/"] as const;
 
@@ -89,9 +90,17 @@ export function validateOriginalFile(file: File): string | null {
   return `허용되지 않는 형식입니다: ${file.name} (${t || "타입 없음"})`;
 }
 
+export function validateBatchTotal(files: File[]): string | null {
+  const total = files.reduce((sum, f) => sum + f.size, 0);
+  if (total > BATCH_MAX_BYTES) {
+    return `한 번에 업로드할 수 있는 총 용량은 ${formatMaxBytes(BATCH_MAX_BYTES)} 입니다. (현재 ${formatMaxBytes(total)})`;
+  }
+  return null;
+}
+
 export function uploadHints() {
   return {
     cover: `이미지, 최대 ${formatMaxBytes(COVER_MAX_BYTES)}`,
-    original: `PDF·이미지·영상·ZIP 등, 파일당 최대 ${formatMaxBytes(ORIGINAL_MAX_BYTES)}`,
+    original: `PDF·이미지·영상·ZIP 등, 파일당 최대 ${formatMaxBytes(ORIGINAL_MAX_BYTES)} · 1회 최대 ${formatMaxBytes(BATCH_MAX_BYTES)}`,
   };
 }

@@ -1,12 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { signOutEverywhere } from "@/lib/auth/supabase-server-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await signOutEverywhere();
   revalidatePath("/", "layout");
   redirect("/");
 }

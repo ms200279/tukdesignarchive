@@ -1,4 +1,4 @@
-import type { WorkFile, WorkFileKind } from "@/types/database";
+import type { WorkFile, WorkFileKind } from "@/types/domain";
 
 /** 마이그레이션 전·후 행 모두 안전하게 파싱 */
 export function normalizeWorkFileRow(r: Record<string, unknown>): WorkFile {

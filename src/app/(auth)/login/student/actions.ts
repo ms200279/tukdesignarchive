@@ -1,7 +1,7 @@
 "use server";
 
 import { studentAuthEmail } from "@/lib/auth/student-email";
-import { createClient } from "@/lib/supabase/server";
+import { signInWithPassword } from "@/lib/auth/supabase-server-auth";
 import { redirect } from "next/navigation";
 
 export async function loginAsStudent(formData: FormData) {
@@ -15,11 +15,7 @@ export async function loginAsStudent(formData: FormData) {
     redirect("/login/student?error=invalid");
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { error } = await signInWithPassword({ email, password });
 
   if (error) {
     redirect("/login/student?error=credentials");

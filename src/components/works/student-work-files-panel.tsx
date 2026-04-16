@@ -2,30 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { WORK_FILES_BUCKET } from "@/lib/constants";
 import {
   uploadHints,
+  validateBatchTotal,
   validateCoverFile,
   validateOriginalFile,
 } from "@/lib/uploads/limits";
-import { createClient } from "@/lib/supabase/client";
-import type { WorkFile } from "@/types/database";
+import {
+  assignCoverSeriesForWork,
+  signedUrlForCoverPreview,
+  uploadWorkFileVersion,
+} from "@/lib/storage/work-file-server-actions";
+import type { WorkFile } from "@/types/domain";
 import { WorkFileDownload } from "@/components/works/work-file-download";
-
-function sanitizeFilename(name: string) {
-  return name.replace(/[^\w.\-()가-힣]/g, "_").slice(0, 160);
-}
-
-function storagePath(
-  userId: string,
-  workId: string,
-  kind: "cover" | "original",
-  seriesId: string,
-  version: number,
-  safeName: string,
-) {
-  return `${userId}/${workId}/${kind}/${seriesId}/v${version}_${safeName}`;
-}
 
 export type FileSeriesGroup = {
   seriesId: string;
@@ -54,13 +43,10 @@ function CoverPreview({ storagePath: path }: { storagePath: string }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase.storage
-        .from(WORK_FILES_BUCKET)
-        .createSignedUrl(path, 900);
+      const res = await signedUrlForCoverPreview(path);
       if (cancelled) return;
-      if (error || !data?.signedUrl) setErr(true);
-      else setUrl(data.signedUrl);
+      if ("error" in res) setErr(true);
+      else setUrl(res.signedUrl);
     })();
     return () => {
       cancelled = true;
@@ -89,12 +75,10 @@ function CoverPreview({ storagePath: path }: { storagePath: string }) {
 
 export function StudentWorkFilesPanel({
   workId,
-  userId,
   initialCoverSeriesId,
   files,
 }: {
   workId: string;
-  userId: string;
   initialCoverSeriesId: string | null;
   files: WorkFile[];
 }) {
@@ -132,85 +116,15 @@ export function StudentWorkFilesPanel({
       kind: "cover" | "original",
       seriesId: string,
     ): Promise<string | null> => {
-      const supabase = createClient();
-
-      const { error: bumpErr } = await supabase
-        .from("work_files")
-        .update({ is_latest: false })
-        .eq("work_id", workId)
-        .eq("series_id", seriesId);
-
-      if (bumpErr) {
-        return bumpErr.message;
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await uploadWorkFileVersion(workId, kind, seriesId, fd);
+      if (!res.ok) {
+        return res.message;
       }
-
-      const { data: maxRow } = await supabase
-        .from("work_files")
-        .select("version")
-        .eq("series_id", seriesId)
-        .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const nextVersion = (maxRow?.version ?? 0) + 1;
-      const safe = sanitizeFilename(file.name);
-      const path = storagePath(
-        userId,
-        workId,
-        kind,
-        seriesId,
-        nextVersion,
-        safe,
-      );
-
-      const { error: upErr } = await supabase.storage
-        .from(WORK_FILES_BUCKET)
-        .upload(path, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type || undefined,
-        });
-
-      if (upErr) {
-        if (nextVersion > 1) {
-          await supabase
-            .from("work_files")
-            .update({ is_latest: true })
-            .eq("work_id", workId)
-            .eq("series_id", seriesId)
-            .eq("version", nextVersion - 1);
-        }
-        return upErr.message;
-      }
-
-      const { error: insErr } = await supabase.from("work_files").insert({
-        work_id: workId,
-        storage_path: path,
-        original_name: file.name,
-        content_type: file.type || null,
-        byte_size: file.size,
-        kind,
-        series_id: seriesId,
-        version: nextVersion,
-        is_latest: true,
-      });
-
-      if (insErr) {
-        await supabase.storage.from(WORK_FILES_BUCKET).remove([path]);
-        if (nextVersion > 1) {
-          await supabase
-            .from("work_files")
-            .update({ is_latest: true })
-            .eq("work_id", workId)
-            .eq("series_id", seriesId)
-            .eq("version", nextVersion - 1);
-        }
-        return insErr.message;
-      }
-
       return null;
     },
-    [userId, workId],
+    [workId],
   );
 
   const onCoverFile = useCallback(
@@ -222,20 +136,16 @@ export function StudentWorkFilesPanel({
       }
       setBusy(true);
       setFeedback(null);
-      const supabase = createClient();
 
       let sid = coverSeriesId;
       if (!sid) {
-        sid = crypto.randomUUID();
-        const { error: wErr } = await supabase
-          .from("works")
-          .update({ cover_series_id: sid })
-          .eq("id", workId);
-        if (wErr) {
+        const assign = await assignCoverSeriesForWork(workId);
+        if ("error" in assign) {
           setBusy(false);
-          pushFeedback("err", wErr.message);
+          pushFeedback("err", assign.error);
           return;
         }
+        sid = assign.seriesId;
         setCoverSeriesId(sid);
       }
 
@@ -358,10 +268,17 @@ export function StudentWorkFilesPanel({
                 const list = e.target.files;
                 if (!list?.length) return;
                 void (async () => {
+                  const selected = Array.from(list);
+                  const batchErr = validateBatchTotal(selected);
+                  if (batchErr) {
+                    pushFeedback("err", batchErr);
+                    e.target.value = "";
+                    return;
+                  }
                   const failed: string[] = [];
                   let ok = 0;
                   setBusy(true);
-                  for (const f of Array.from(list)) {
+                  for (const f of selected) {
                     const v = validateOriginalFile(f);
                     if (v) {
                       failed.push(v);

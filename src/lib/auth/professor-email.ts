@@ -1,4 +1,4 @@
-import { professorEmailDomain } from "@/lib/constants";
+import { professorEmailDomain } from "@/config/env";
 
 export function normalizeProfessorEmail(email: string) {
   return email.trim().toLowerCase();

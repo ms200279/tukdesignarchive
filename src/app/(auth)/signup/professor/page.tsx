@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { professorEmailDomain } from "@/lib/constants";
+import { professorEmailDomain } from "@/config/env";
 import { signUpAsProfessor } from "./actions";
 
 export default async function ProfessorSignupPage({

@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { WORK_FILES_BUCKET } from "@/lib/constants";
-import { createClient } from "@/lib/supabase/client";
-import type { WorkFile } from "@/types/database";
+import { signedUrlForWorkFileStoragePath } from "@/lib/storage/work-file-server-actions";
+import type { WorkFile } from "@/types/domain";
 
 function formatBytes(n: number | null) {
   if (n == null || Number.isNaN(n)) return "—";
@@ -17,14 +16,10 @@ export function WorkFileDownload({ file }: { file: WorkFile }) {
 
   async function openSigned() {
     setBusy(true);
-    const supabase = createClient();
-    const { data, error } = await supabase.storage
-      .from(WORK_FILES_BUCKET)
-      .createSignedUrl(file.storage_path, 60 * 30);
-
+    const res = await signedUrlForWorkFileStoragePath(file.storage_path);
     setBusy(false);
-    if (error || !data?.signedUrl) return;
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    if ("error" in res) return;
+    window.open(res.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   return (

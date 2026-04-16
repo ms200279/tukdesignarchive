@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import type { Work } from "@/types/database";
+import * as workRepo from "@/repositories/work.repository";
+import type { Work } from "@/types/domain";
 
 type Row = Pick<
   Work,
@@ -10,15 +10,9 @@ type Row = Pick<
 };
 
 export default async function ProfessorDashboardPage() {
-  const supabase = await createClient();
-  const { data: rows, error } = await supabase
-    .from("works")
-    .select(
-      "id, title, exhibition_year, updated_at, owner:profiles!works_owner_id_fkey(display_name, student_id)",
-    )
-    .order("updated_at", { ascending: false });
+  const { rows, error } = await workRepo.listWorksForProfessor();
 
-  const works = (rows ?? []) as unknown as Row[];
+  const works = rows as unknown as Row[];
 
   return (
     <div className="mx-auto max-w-6xl">

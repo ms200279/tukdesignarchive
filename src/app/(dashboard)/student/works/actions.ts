@@ -1,9 +1,9 @@
 "use server";
 
 import { getSessionProfile } from "@/lib/auth/session";
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import * as workRepo from "@/repositories/work.repository";
 
 export async function createWork() {
   const session = await getSessionProfile();
@@ -11,22 +11,17 @@ export async function createWork() {
     redirect("/login/student");
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("works")
-    .insert({
-      owner_id: session.userId,
-      title: "새 작품",
-    })
-    .select("id")
-    .single();
+  const result = await workRepo.insertWorkForOwner({
+    ownerId: session.userId,
+    title: "새 작품",
+  });
 
-  if (error || !data) {
+  if ("error" in result) {
     redirect("/student?error=create");
   }
 
   revalidatePath("/student");
-  redirect(`/student/works/${data.id}`);
+  redirect(`/student/works/${result.id}`);
 }
 
 export async function updateWorkMetadata(formData: FormData) {
@@ -41,20 +36,16 @@ export async function updateWorkMetadata(formData: FormData) {
   }
 
   const exhibition_year = yearRaw ? Number.parseInt(yearRaw, 10) : null;
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("works")
-    .update({
-      title: title || "제목 없음",
-      description: description || null,
-      exhibition_year:
-        exhibition_year !== null && !Number.isNaN(exhibition_year)
-          ? exhibition_year
-          : null,
-    })
-    .eq("id", workId)
-    .eq("owner_id", session.userId);
+  const { error } = await workRepo.updateWorkMetadataForOwner({
+    ownerId: session.userId,
+    workId,
+    title: title || "제목 없음",
+    description: description || null,
+    exhibition_year:
+      exhibition_year !== null && !Number.isNaN(exhibition_year)
+        ? exhibition_year
+        : null,
+  });
 
   if (error) {
     redirect(`/student/works/${workId}?error=save`);

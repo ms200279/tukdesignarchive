@@ -1,15 +1,13 @@
+import { getPublicSupabaseAnonKey, getPublicSupabaseUrl } from "@/config/env";
+import { refreshAuthSessionFromRequest } from "@/lib/db/update-session";
 import { type NextRequest, NextResponse } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
+  if (!getPublicSupabaseUrl() || !getPublicSupabaseAnonKey()) {
     return NextResponse.next({ request });
   }
 
-  return updateSession(request);
+  return refreshAuthSessionFromRequest(request);
 }
 
 export const config = {

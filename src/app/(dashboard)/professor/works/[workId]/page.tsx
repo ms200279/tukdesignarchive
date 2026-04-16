@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { WorkFileDownload } from "@/components/works/work-file-download";
 import { normalizeWorkFileRow } from "@/lib/work-files-normalize";
-import { createClient } from "@/lib/supabase/server";
-import type { Work, WorkFile } from "@/types/database";
+import * as workFileRepo from "@/repositories/work-file.repository";
+import * as workRepo from "@/repositories/work.repository";
+import type { Work, WorkFile } from "@/types/domain";
 
 type WorkRow = Work & {
   owner: { display_name: string | null; student_id: string | null } | null;
@@ -35,25 +36,14 @@ export default async function ProfessorWorkDetailPage({
   params: Promise<{ workId: string }>;
 }) {
   const { workId } = await params;
-  const supabase = await createClient();
 
-  const { data: work, error } = await supabase
-    .from("works")
-    .select(
-      "*, owner:profiles!works_owner_id_fkey(display_name, student_id)",
-    )
-    .eq("id", workId)
-    .maybeSingle();
+  const { work, error } = await workRepo.getWorkByIdForProfessorView(workId);
 
   if (error || !work) {
     notFound();
   }
 
-  const { data: fileRows } = await supabase
-    .from("work_files")
-    .select("*")
-    .eq("work_id", workId)
-    .order("created_at", { ascending: true });
+  const { data: fileRows } = await workFileRepo.listFilesForWork(workId);
 
   const files = (fileRows ?? []).map((row) =>
     normalizeWorkFileRow(row as Record<string, unknown>),

@@ -1,9 +1,10 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import { WorkStatusBadge } from "@/components/student/work-status-badge";
 import { getSessionProfile } from "@/lib/auth/session";
 import { deriveWorkStatus } from "@/lib/student/work-status";
-import { createClient } from "@/lib/supabase/server";
+import * as workFileRepo from "@/repositories/work-file.repository";
+import * as workRepo from "@/repositories/work.repository";
+import * as studentRegistryRepo from "@/repositories/student-registry.repository";
 
 type WorkRow = {
   id: string;
@@ -12,36 +13,6 @@ type WorkRow = {
   exhibition_year: number | null;
   updated_at: string;
 };
-
-async function latestFileCountByWorkId(
-  supabase: SupabaseClient,
-  workIds: string[],
-): Promise<Record<string, number>> {
-  const map: Record<string, number> = {};
-  if (workIds.length === 0) return map;
-
-  const q = await supabase
-    .from("work_files")
-    .select("work_id")
-    .eq("is_latest", true)
-    .in("work_id", workIds);
-
-  if (q.error) {
-    const q2 = await supabase
-      .from("work_files")
-      .select("work_id")
-      .in("work_id", workIds);
-    for (const r of q2.data ?? []) {
-      map[r.work_id] = (map[r.work_id] ?? 0) + 1;
-    }
-    return map;
-  }
-
-  for (const r of q.data ?? []) {
-    map[r.work_id] = (map[r.work_id] ?? 0) + 1;
-  }
-  return map;
-}
 
 function formatUpdatedAt(iso: string) {
   return new Date(iso).toLocaleString("ko-KR", {
@@ -55,23 +26,18 @@ function formatUpdatedAt(iso: string) {
 
 export default async function StudentDashboardPage() {
   const session = await getSessionProfile();
-  const supabase = await createClient();
-  const { data: studentRow } = session
-    ? await supabase
-        .from("student_registry")
-        .select("id")
-        .eq("profile_id", session.userId)
-        .maybeSingle()
-    : { data: null };
+  const studentRegistryId = session
+    ? await studentRegistryRepo.findRegistryIdByProfileId(session.userId)
+    : null;
 
-  const { data: rows, error } = await supabase
-    .from("works")
-    .select("id, title, description, exhibition_year, updated_at")
-    .order("updated_at", { ascending: false });
+  const { rows, error: listError } = session
+    ? await workRepo.listWorksForOwner(session.userId)
+    : { rows: [], error: null };
 
-  const works = (rows ?? []) as WorkRow[];
+  const works = rows as WorkRow[];
   const workIds = works.map((w) => w.id);
-  const fileCountMap = await latestFileCountByWorkId(supabase, workIds);
+  const fileCountMap = await workFileRepo.countLatestFilesByWorkIds(workIds);
+  const error = listError;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -100,7 +66,7 @@ export default async function StudentDashboardPage() {
             <div>
               <dt className="text-xs text-slate-500">학생 ID</dt>
               <dd className="text-sm font-medium text-slate-900">
-                {studentRow?.id ?? "—"}
+                {studentRegistryId ?? "—"}
               </dd>
             </div>
           </dl>

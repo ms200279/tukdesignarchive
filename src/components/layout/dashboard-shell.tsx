@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
-import type { Profile } from "@/types/database";
+import type { Profile } from "@/types/domain";
 
 const navStudent = [
   { href: "/student", label: "내 작품" },
