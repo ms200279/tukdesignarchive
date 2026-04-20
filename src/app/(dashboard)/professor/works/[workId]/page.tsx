@@ -1,28 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { WorkFileDownload } from "@/components/works/work-file-download";
+import { Suspense } from "react";
+import {
+  ProfessorWorkFilesSection,
+  ProfessorWorkFilesSectionSkeleton,
+} from "@/components/works/professor-work-files-section";
 import { worksRepository, workFilesRepository } from "@/repositories";
-import type { WorkFile } from "@/types/domain";
-
-type SeriesGroup = {
-  seriesId: string;
-  kind: "cover" | "original";
-  versions: WorkFile[];
-};
-
-function groupBySeries(files: WorkFile[]): SeriesGroup[] {
-  const map = new Map<string, WorkFile[]>();
-  for (const f of files) {
-    const list = map.get(f.series_id) ?? [];
-    list.push(f);
-    map.set(f.series_id, list);
-  }
-  return [...map.entries()].map(([seriesId, versions]) => {
-    const sorted = [...versions].sort((a, b) => b.version - a.version);
-    const kind = sorted[0]?.kind ?? "original";
-    return { seriesId, kind, versions: sorted };
-  });
-}
 
 export default async function ProfessorWorkDetailPage({
   params,
@@ -31,17 +14,18 @@ export default async function ProfessorWorkDetailPage({
 }) {
   const { workId } = await params;
 
-  const { work, error } = await worksRepository.getWorkByIdForProfessorView(workId);
+  // Kick off the files fetch eagerly so it overlaps with the work fetch; we
+  // pass the pending promise into a Suspense child that awaits it. This
+  // keeps total DB time the same as `Promise.all` but lets the metadata
+  // card render as soon as `work` resolves, without waiting on `files`.
+  const filesPromise = workFilesRepository.listFilesForWork(workId);
+
+  const { work, error } =
+    await worksRepository.getWorkByIdForProfessorView(workId);
 
   if (error || !work) {
     notFound();
   }
-
-  const { files } = await workFilesRepository.listFilesForWork(workId);
-
-  const groups = groupBySeries(files);
-  const coverGroups = groups.filter((g) => g.kind === "cover");
-  const originalGroups = groups.filter((g) => g.kind === "original");
 
   const w = work;
 
@@ -93,59 +77,9 @@ export default async function ProfessorWorkDetailPage({
         </div>
       </div>
 
-      <div className="mt-8 space-y-6">
-        <section>
-          <h2 className="text-sm font-semibold text-slate-900">대표 이미지</h2>
-          <div className="mt-3 space-y-3">
-            {coverGroups.length === 0 ? (
-              <p className="text-sm text-slate-500">등록된 대표 이미지가 없습니다.</p>
-            ) : (
-              coverGroups.map((g) => (
-                <div
-                  key={g.seriesId}
-                  className="rounded-lg border border-slate-200 bg-white p-3"
-                >
-                  <p className="mb-2 text-xs text-slate-500">시리즈 (버전 {g.versions.length})</p>
-                  <ul className="space-y-2">
-                    {g.versions.map((f) => (
-                      <li key={f.id}>
-                        <WorkFileDownload file={f} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-sm font-semibold text-slate-900">원본 파일</h2>
-          <div className="mt-3 space-y-3">
-            {originalGroups.length === 0 ? (
-              <p className="text-sm text-slate-500">원본 파일이 없습니다.</p>
-            ) : (
-              originalGroups.map((g) => (
-                <div
-                  key={g.seriesId}
-                  className="rounded-lg border border-slate-200 bg-white p-3"
-                >
-                  <p className="mb-2 text-xs text-slate-500">
-                    자산 · 버전 {g.versions.length}
-                  </p>
-                  <ul className="space-y-2">
-                    {g.versions.map((f) => (
-                      <li key={f.id}>
-                        <WorkFileDownload file={f} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-      </div>
+      <Suspense fallback={<ProfessorWorkFilesSectionSkeleton />}>
+        <ProfessorWorkFilesSection filesPromise={filesPromise} />
+      </Suspense>
     </div>
   );
 }

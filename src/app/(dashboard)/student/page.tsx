@@ -1,83 +1,42 @@
 import Link from "next/link";
-import { WorkStatusBadge } from "@/components/student/work-status-badge";
-import { getAuthIdentity } from "@/lib/auth/session";
-import { deriveWorkStatus } from "@/lib/student/work-status";
+import { Suspense } from "react";
 import {
-  usersRepository,
-  worksRepository,
-  workFilesRepository,
-} from "@/repositories";
-import type { StudentWorkListItem } from "@/types/domain";
+  StudentIdentityPanel,
+  StudentIdentityPanelSkeleton,
+} from "@/components/student/student-identity-panel";
+import {
+  StudentWorksList,
+  StudentWorksListSkeleton,
+} from "@/components/student/student-works-list";
 
-function formatUpdatedAt(iso: string) {
-  return new Date(iso).toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
+/**
+ * `/student` dashboard.
+ *
+ * This page is intentionally a thin shell: only `searchParams` is awaited
+ * here so the header, CTA and status banners can render immediately. All
+ * data fetches live inside two independent `<Suspense>` widgets:
+ *
+ *   - `StudentIdentityPanel` → identity (cache hit) + registry id (1 RTT)
+ *   - `StudentWorksList`     → works (1 RTT) → file counts (1 RTT, dependent)
+ *
+ * Both widgets are siblings, so React kicks off their async work in parallel
+ * and streams each one in as soon as it finishes. The internal
+ * `works → fileCounts` waterfall inside `StudentWorksList` is real (file
+ * counts need the ids from works); collapsing that into a single SQL query
+ * is tracked as a follow-up.
+ */
 export default async function StudentDashboardPage({
   searchParams,
 }: {
   searchParams: Promise<{ deleted?: string; error?: string }>;
 }) {
-  const [sp, identity] = await Promise.all([searchParams, getAuthIdentity()]);
-
-  // `registry` and `works` are independent of each other; fetch them in
-  // parallel to collapse two sequential RTTs into one. Data authorization is
-  // enforced by RLS regardless.
-  const [studentRegistryId, worksResult] = identity
-    ? await Promise.all([
-        usersRepository.findStudentRegistryIdByProfileId(identity.userId),
-        worksRepository.listWorksForOwner(identity.userId),
-      ])
-    : [null, { rows: [], error: null as Error | null }];
-
-  const { rows, error: listError } = worksResult;
-  const works: StudentWorkListItem[] = rows;
-  const workIds = works.map((w) => w.id);
-  const fileCountMap =
-    await workFilesRepository.countLatestFilesByWorkIds(workIds);
-  const error = listError;
+  const sp = await searchParams;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          로그인 정보
-        </p>
-        {identity ? (
-          <dl className="mt-3 grid gap-3 sm:grid-cols-4">
-            <div>
-              <dt className="text-xs text-slate-500">이름</dt>
-              <dd className="text-sm font-medium text-slate-900">
-                {identity.display_name ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">학번</dt>
-              <dd className="text-sm font-medium text-slate-900">
-                {identity.student_id ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">역할</dt>
-              <dd className="text-sm font-medium text-slate-900">학생</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-slate-500">학생 ID</dt>
-              <dd className="text-sm font-medium text-slate-900">
-                {studentRegistryId ?? "—"}
-              </dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">세션을 불러올 수 없습니다.</p>
-        )}
-      </section>
+      <Suspense fallback={<StudentIdentityPanelSkeleton />}>
+        <StudentIdentityPanel />
+      </Suspense>
 
       <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -105,135 +64,17 @@ export default async function StudentDashboardPage({
         </p>
       ) : null}
       {sp.error === "delete" ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          role="alert"
+        >
           작품을 삭제하지 못했습니다. 다시 로그인한 뒤 시도해 주세요.
         </p>
       ) : null}
-      {error ? (
-        <p className="text-sm text-red-600" role="alert">
-          목록을 불러오지 못했습니다. Supabase 연결과 RLS를 확인해 주세요.
-        </p>
-      ) : null}
 
-      {/* 데스크톱: 테이블 */}
-      <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-white">
-            <tr className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              <th className="px-4 py-3 font-medium">제목</th>
-              <th className="px-4 py-3 font-medium">상태</th>
-              <th className="px-4 py-3 font-medium">연도</th>
-              <th className="px-4 py-3 font-medium">최근 수정</th>
-              <th className="px-4 py-3 text-right font-medium">관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {works.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-4 py-12 text-center text-sm text-slate-500"
-                >
-                  등록된 작품이 없습니다. 상단의 &quot;작품 등록&quot;으로
-                  시작하세요.
-                </td>
-              </tr>
-            ) : (
-              works.map((w) => {
-                const fc = fileCountMap[w.id] ?? 0;
-                const status = deriveWorkStatus({
-                  title: w.title,
-                  description: w.description,
-                  exhibition_year: w.exhibition_year,
-                  fileCount: fc,
-                });
-                return (
-                  <tr key={w.id} className="hover:bg-slate-50/80">
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {w.title}
-                    </td>
-                    <td className="px-4 py-3">
-                      <WorkStatusBadge
-                        label={status.label}
-                        tone={status.tone}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {w.exhibition_year ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 tabular-nums text-slate-600">
-                      {formatUpdatedAt(w.updated_at)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/student/works/${w.id}`}
-                        className="text-sm font-medium text-slate-900 underline decoration-slate-300 underline-offset-2 hover:decoration-slate-900"
-                      >
-                        편집
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 모바일: 카드 */}
-      <ul className="space-y-3 md:hidden">
-        {works.length === 0 ? (
-          <li className="rounded-lg border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
-            등록된 작품이 없습니다. &quot;작품 등록&quot;으로 시작하세요.
-          </li>
-        ) : (
-          works.map((w) => {
-            const fc = fileCountMap[w.id] ?? 0;
-            const status = deriveWorkStatus({
-              title: w.title,
-              description: w.description,
-              exhibition_year: w.exhibition_year,
-              fileCount: fc,
-            });
-            return (
-              <li
-                key={w.id}
-                className="rounded-lg border border-slate-200 bg-white p-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    {w.title}
-                  </h2>
-                  <WorkStatusBadge
-                    label={status.label}
-                    tone={status.tone}
-                  />
-                </div>
-                <dl className="mt-3 space-y-2 text-xs text-slate-600">
-                  <div className="flex justify-between gap-2 border-t border-slate-100 pt-2">
-                    <dt>전시 연도</dt>
-                    <dd className="font-medium text-slate-800">
-                      {w.exhibition_year ?? "—"}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <dt>최근 수정</dt>
-                    <dd className="tabular-nums text-slate-800">
-                      {formatUpdatedAt(w.updated_at)}
-                    </dd>
-                  </div>
-                </dl>
-                <Link
-                  href={`/student/works/${w.id}`}
-                  className="mt-3 inline-flex text-sm font-medium text-slate-900 underline decoration-slate-300 underline-offset-2"
-                >
-                  편집하기
-                </Link>
-              </li>
-            );
-          })
-        )}
-      </ul>
+      <Suspense fallback={<StudentWorksListSkeleton />}>
+        <StudentWorksList />
+      </Suspense>
     </div>
   );
 }

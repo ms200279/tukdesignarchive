@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { updateWorkMetadata } from "../actions";
 import { DeleteWorkSection } from "@/components/works/delete-work-section";
-import { StudentWorkFilesPanel } from "@/components/works/student-work-files-panel";
+import {
+  StudentWorkFilesSection,
+  StudentWorkFilesSectionSkeleton,
+} from "@/components/works/student-work-files-section";
 import { getAuthIdentity, isStudentIdentity } from "@/lib/auth/session";
 import { worksRepository, workFilesRepository } from "@/repositories";
 import type { Work } from "@/types/domain";
@@ -27,18 +31,17 @@ export default async function StudentWorkDetailPage({
     notFound();
   }
 
-  // RLS (`works_student_all` / `work_files_student_all`) enforces ownership.
-  // `owner_id` filter and the two selects can run in parallel.
-  const [workResult, filesResult] = await Promise.all([
-    worksRepository.getOwnedWorkById({
-      ownerId: identity.userId,
-      workId,
-    }),
-    workFilesRepository.listFilesForWork(workId),
-  ]);
+  // Kick off the files fetch eagerly so it overlaps with the work fetch,
+  // then defer awaiting it until `<StudentWorkFilesSection>` renders inside
+  // `<Suspense>`. Net DB time is the same as `Promise.all`, but the edit
+  // form above-the-fold no longer waits on the files query to paint.
+  // RLS (`work_files_student_all`) still enforces ownership.
+  const filesPromise = workFilesRepository.listFilesForWork(workId);
 
-  const { work, error } = workResult;
-  const { files, error: filesError } = filesResult;
+  const { work, error } = await worksRepository.getOwnedWorkById({
+    ownerId: identity.userId,
+    workId,
+  });
 
   if (error || !work) {
     notFound();
@@ -81,25 +84,24 @@ export default async function StudentWorkDetailPage({
       {sp.error === "delete" ? (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           작품 레코드 삭제에 실패했습니다.
-          {errorDetail ? ` (${errorDetail})` : " 잠시 후 다시 시도해 주세요."}
+          {errorDetail
+            ? ` (${errorDetail})`
+            : " 잠시 후 다시 시도해 주세요."}
         </p>
       ) : null}
       {sp.error === "delete_storage" ? (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           Storage 파일 삭제에 실패해 작품은 그대로 두었습니다.
-          {errorDetail ? ` (${errorDetail})` : " 네트워크·권한을 확인한 뒤 다시 시도해 주세요."}
+          {errorDetail
+            ? ` (${errorDetail})`
+            : " 네트워크·권한을 확인한 뒤 다시 시도해 주세요."}
         </p>
       ) : null}
       {sp.error === "delete_list" ? (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          파일 목록을 불러오지 못해 삭제를 중단했습니다. (DB·RLS·네트워크를 확인해 주세요)
+          파일 목록을 불러오지 못해 삭제를 중단했습니다. (DB·RLS·네트워크를
+          확인해 주세요)
           {errorDetail ? ` (${errorDetail})` : ""}
-        </p>
-      ) : null}
-      {filesError ? (
-        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          첨부 파일 목록을 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해 주세요. (
-          {filesError})
         </p>
       ) : null}
 
@@ -162,11 +164,13 @@ export default async function StudentWorkDetailPage({
       </form>
 
       <div className="mt-8">
-        <StudentWorkFilesPanel
-          workId={w.id}
-          initialCoverSeriesId={w.cover_series_id ?? null}
-          files={filesError ? [] : files}
-        />
+        <Suspense fallback={<StudentWorkFilesSectionSkeleton />}>
+          <StudentWorkFilesSection
+            filesPromise={filesPromise}
+            workId={w.id}
+            initialCoverSeriesId={w.cover_series_id ?? null}
+          />
+        </Suspense>
       </div>
 
       <DeleteWorkSection workId={w.id} workTitle={w.title} />
