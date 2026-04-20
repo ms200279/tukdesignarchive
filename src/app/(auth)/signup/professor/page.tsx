@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { professorEmailDomain } from "@/config";
+import { professorEmailDomains } from "@/config";
 import { signUpAsProfessor } from "./actions";
 
 export default async function ProfessorSignupPage({
@@ -8,10 +8,15 @@ export default async function ProfessorSignupPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const sp = await searchParams;
-  const domain = professorEmailDomain();
+  const domains = professorEmailDomains();
+  const primaryDomain = domains[0] ?? "";
+  const domainLabel =
+    domains.length === 1
+      ? `@${domains[0]}`
+      : domains.map((d) => `@${d}`).join(" · ");
   const err =
     sp.error === "email"
-      ? `학교 이메일(@${domain})만 가입할 수 있습니다.`
+      ? `학교 이메일(${domainLabel})만 가입할 수 있습니다.`
       : sp.error === "name"
         ? "이름을 입력해 주세요."
         : sp.error === "password"
@@ -35,7 +40,7 @@ export default async function ProfessorSignupPage({
       </div>
       <h1 className="mt-2 text-xl font-semibold text-slate-900">계정 생성</h1>
       <p className="mt-1 text-sm text-slate-600">
-        학교 이메일(@{domain})로 교수 계정을 생성합니다.
+        학교 이메일({domainLabel})로 교수 계정을 생성합니다.
       </p>
 
       {err ? (
@@ -59,7 +64,7 @@ export default async function ProfessorSignupPage({
             autoComplete="email"
             required
             className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none ring-slate-300 focus:ring-2"
-            placeholder={`name@${domain}`}
+            placeholder={`name@${primaryDomain}`}
           />
         </div>
         <div className="flex flex-col gap-1.5">

@@ -1,6 +1,6 @@
 import {
   DEFAULT_COVER_PREVIEW_SIGNED_URL_TTL_SEC,
-  DEFAULT_PROFESSOR_EMAIL_DOMAIN,
+  DEFAULT_PROFESSOR_EMAIL_DOMAINS,
   DEFAULT_STUDENT_EMAIL_DOMAIN,
   DEFAULT_WORK_FILE_DOWNLOAD_SIGNED_URL_TTL_SEC,
   DEFAULT_WORK_FILES_BUCKET_ID,
@@ -60,10 +60,26 @@ export function studentEmailDomain(): string {
   return trimEnv("NEXT_PUBLIC_STUDENT_EMAIL_DOMAIN") ?? DEFAULT_STUDENT_EMAIL_DOMAIN;
 }
 
+/**
+ * 교수 허용 도메인 목록. 환경 변수는 쉼표 구분 문자열로 받습니다.
+ * 예: `NEXT_PUBLIC_PROFESSOR_EMAIL_DOMAIN="tukorea.ac.kr,kpu.ac.kr"`
+ *
+ * 각 항목은 소문자·공백 제거로 정규화되며, 비어있는 값이면 기본 도메인
+ * 리스트(`DEFAULT_PROFESSOR_EMAIL_DOMAINS`)를 반환합니다.
+ */
+export function professorEmailDomains(): readonly string[] {
+  const raw = trimEnv("NEXT_PUBLIC_PROFESSOR_EMAIL_DOMAIN");
+  if (!raw) return DEFAULT_PROFESSOR_EMAIL_DOMAINS;
+  const parsed = raw
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter((d) => d.length > 0);
+  return parsed.length > 0 ? parsed : DEFAULT_PROFESSOR_EMAIL_DOMAINS;
+}
+
+/** UI 표시용: 허용 도메인 중 첫 번째(대표) 도메인. 검증에는 사용 금지. */
 export function professorEmailDomain(): string {
-  return (
-    trimEnv("NEXT_PUBLIC_PROFESSOR_EMAIL_DOMAIN") ?? DEFAULT_PROFESSOR_EMAIL_DOMAIN
-  );
+  return professorEmailDomains()[0] ?? DEFAULT_PROFESSOR_EMAIL_DOMAINS[0];
 }
 
 export function coverPreviewSignedUrlTtlSeconds(): number {

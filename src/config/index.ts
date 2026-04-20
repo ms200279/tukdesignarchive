@@ -6,6 +6,7 @@ export {
   getPublicSupabaseAnonKey,
   getPublicSupabaseUrl,
   professorEmailDomain,
+  professorEmailDomains,
   requirePublicSupabaseClientConfig,
   studentEmailDomain,
   workFileDownloadSignedUrlTtlSeconds,
