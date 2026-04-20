@@ -47,6 +47,30 @@ export async function refreshAuthSessionFromRequest(request: NextRequest) {
     return supabaseResponse;
   }
 
+  const pathname = request.nextUrl.pathname;
+
+  // Fast path for anonymous requests.
+  //
+  // Supabase-ssr persists its session in cookies whose names start with
+  // `sb-`. If none are present on the request, the visitor is definitely
+  // signed out — so we can skip creating a Supabase client, decoding a
+  // JWT, and touching the JWKS cache entirely. This keeps the common
+  // case on `/` (public landing) at ~0ms of middleware overhead, and
+  // also defers the one-time JWKS cold-start cost until a real
+  // authenticated request arrives.
+  const hasSupabaseAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith("sb-"));
+  if (!hasSupabaseAuthCookie) {
+    if (pathname.startsWith("/student")) {
+      return redirectTo(request, "/login/student");
+    }
+    if (pathname.startsWith("/professor")) {
+      return redirectTo(request, "/login/professor");
+    }
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(url, anon, {
     cookies: {
       getAll() {
@@ -72,9 +96,14 @@ export async function refreshAuthSessionFromRequest(request: NextRequest) {
 
   const { data, error } = await supabase.auth.getClaims();
   const role = error ? null : readRoleFromClaims(data?.claims);
-  const pathname = request.nextUrl.pathname;
 
-  if (pathname.startsWith("/student")) {
+  if (pathname === "/") {
+    // Public landing is statically rendered; only authenticated users get
+    // bounced into their dashboard. Anonymous visitors fall through and
+    // receive the prerendered HTML.
+    if (role === "student") return redirectTo(request, "/student");
+    if (role === "professor") return redirectTo(request, "/professor");
+  } else if (pathname.startsWith("/student")) {
     if (!role) return redirectTo(request, "/login/student");
     if (role !== "student") return redirectTo(request, "/professor");
   } else if (pathname.startsWith("/professor")) {

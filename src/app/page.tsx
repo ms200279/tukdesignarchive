@@ -1,20 +1,19 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import {
-  getAuthIdentity,
-  isProfessorIdentity,
-  isStudentIdentity,
-} from "@/lib/auth/session";
 
-export default async function HomePage() {
-  const identity = await getAuthIdentity();
-  if (isStudentIdentity(identity)) {
-    redirect("/student");
-  }
-  if (isProfessorIdentity(identity)) {
-    redirect("/professor");
-  }
+/**
+ * Public landing page.
+ *
+ * This page is statically prerendered at build time — it must not read
+ * `cookies()`, `headers()`, `searchParams`, or any request-time data.
+ *
+ * Role-based redirection for authenticated visitors is performed by the
+ * middleware (`src/lib/db/update-session.ts`) so that the HTML produced
+ * here can be served straight from the edge CDN to anonymous users.
+ */
+export const dynamic = "force-static";
+export const revalidate = false;
 
+export default function HomePage() {
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-slate-50 px-6 py-24">
       <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">

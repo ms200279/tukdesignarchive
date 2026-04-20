@@ -10,8 +10,14 @@ export async function middleware(request: NextRequest) {
   return refreshAuthSessionFromRequest(request);
 }
 
-// Only protected route groups go through middleware. Public pages (`/`,
-// `/login/*`, `/signup/*`) never trigger an auth hop.
+// Routes that need auth/role-aware handling:
+//   - `/`                  → bounce authed users to their dashboard; anonymous
+//                            users fall through to the statically prerendered
+//                            landing page.
+//   - `/student/:path*`    → require student session.
+//   - `/professor/:path*`  → require professor session.
+// All other public routes (`/login/*`, `/signup/*`, static assets) remain
+// untouched and may be statically optimized.
 export const config = {
-  matcher: ["/student/:path*", "/professor/:path*"],
+  matcher: ["/", "/student/:path*", "/professor/:path*"],
 };
