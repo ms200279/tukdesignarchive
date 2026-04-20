@@ -55,9 +55,6 @@ export default function HomePage() {
             교수 회원가입
           </Link>
         </div>
-        <p className="mt-8 text-center text-xs text-slate-500">
-          Supabase에 마이그레이션을 적용하고 환경 변수를 설정한 뒤 사용하세요.
-        </p>
       </div>
     </div>
   );
