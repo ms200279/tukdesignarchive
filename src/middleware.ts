@@ -10,6 +10,8 @@ export async function middleware(request: NextRequest) {
   return refreshAuthSessionFromRequest(request);
 }
 
+// Only protected route groups go through middleware. Public pages (`/`,
+// `/login/*`, `/signup/*`) never trigger an auth hop.
 export const config = {
-  matcher: ["/student/:path*", "/professor/:path*", "/login/:path*", "/signup/:path*"],
+  matcher: ["/student/:path*", "/professor/:path*"],
 };

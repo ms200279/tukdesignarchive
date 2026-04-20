@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 import { updateWorkMetadata } from "../actions";
 import { DeleteWorkSection } from "@/components/works/delete-work-section";
 import { StudentWorkFilesPanel } from "@/components/works/student-work-files-panel";
-import { getSessionProfile } from "@/lib/auth/session";
-import { isStudentSession } from "@/lib/auth/role-guards";
+import { getAuthIdentity, isStudentIdentity } from "@/lib/auth/session";
 import { worksRepository, workFilesRepository } from "@/repositories";
 import type { Work } from "@/types/domain";
 
@@ -19,24 +18,31 @@ export default async function StudentWorkDetailPage({
     message?: string;
   }>;
 }) {
-  const { workId } = await params;
-  const sp = await searchParams;
-  const session = await getSessionProfile();
-  if (!isStudentSession(session)) {
+  const [{ workId }, sp, identity] = await Promise.all([
+    params,
+    searchParams,
+    getAuthIdentity(),
+  ]);
+  if (!isStudentIdentity(identity)) {
     notFound();
   }
 
-  const { work, error } = await worksRepository.getOwnedWorkById({
-    ownerId: session.userId,
-    workId,
-  });
+  // RLS (`works_student_all` / `work_files_student_all`) enforces ownership.
+  // `owner_id` filter and the two selects can run in parallel.
+  const [workResult, filesResult] = await Promise.all([
+    worksRepository.getOwnedWorkById({
+      ownerId: identity.userId,
+      workId,
+    }),
+    workFilesRepository.listFilesForWork(workId),
+  ]);
+
+  const { work, error } = workResult;
+  const { files, error: filesError } = filesResult;
 
   if (error || !work) {
     notFound();
   }
-
-  const { files, error: filesError } =
-    await workFilesRepository.listFilesForWork(workId);
 
   const w = work as Work & { cover_series_id?: string | null };
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { WorkStatusBadge } from "@/components/student/work-status-badge";
-import { getSessionProfile } from "@/lib/auth/session";
+import { getAuthIdentity } from "@/lib/auth/session";
 import { deriveWorkStatus } from "@/lib/student/work-status";
 import {
   usersRepository,
@@ -24,16 +24,19 @@ export default async function StudentDashboardPage({
 }: {
   searchParams: Promise<{ deleted?: string; error?: string }>;
 }) {
-  const sp = await searchParams;
-  const session = await getSessionProfile();
-  const studentRegistryId = session
-    ? await usersRepository.findStudentRegistryIdByProfileId(session.userId)
-    : null;
+  const [sp, identity] = await Promise.all([searchParams, getAuthIdentity()]);
 
-  const { rows, error: listError } = session
-    ? await worksRepository.listWorksForOwner(session.userId)
-    : { rows: [], error: null };
+  // `registry` and `works` are independent of each other; fetch them in
+  // parallel to collapse two sequential RTTs into one. Data authorization is
+  // enforced by RLS regardless.
+  const [studentRegistryId, worksResult] = identity
+    ? await Promise.all([
+        usersRepository.findStudentRegistryIdByProfileId(identity.userId),
+        worksRepository.listWorksForOwner(identity.userId),
+      ])
+    : [null, { rows: [], error: null as Error | null }];
 
+  const { rows, error: listError } = worksResult;
   const works: StudentWorkListItem[] = rows;
   const workIds = works.map((w) => w.id);
   const fileCountMap =
@@ -46,18 +49,18 @@ export default async function StudentDashboardPage({
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           로그인 정보
         </p>
-        {session ? (
+        {identity ? (
           <dl className="mt-3 grid gap-3 sm:grid-cols-4">
             <div>
               <dt className="text-xs text-slate-500">이름</dt>
               <dd className="text-sm font-medium text-slate-900">
-                {session.profile.display_name ?? "—"}
+                {identity.display_name ?? "—"}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">학번</dt>
               <dd className="text-sm font-medium text-slate-900">
-                {session.profile.student_id ?? "—"}
+                {identity.student_id ?? "—"}
               </dd>
             </div>
             <div>

@@ -15,6 +15,19 @@ export type SignUpResult =
   | { ok: true; identitiesCount: number }
   | { ok: false; error: AuthErrorLike };
 
+/**
+ * Lightweight, verified auth identity that can be extracted from a signed
+ * access token WITHOUT a round-trip to the auth server.
+ *
+ * Only fields that are safe to derive from JWT claims belong here.
+ */
+export type AuthIdentityClaims = {
+  userId: string;
+  role: "student" | "professor";
+  student_id: string | null;
+  display_name: string | null;
+};
+
 export interface CredentialsAuthPort {
   signInWithPassword(params: {
     email: string;
@@ -29,5 +42,12 @@ export interface CredentialsAuthPort {
 
   signOut(): Promise<void>;
 
-  getCurrentUserId(): Promise<string | null>;
+  /**
+   * Returns the signed JWT claims relevant to the app (no network hop on the
+   * common path — JWT is verified locally via JWKS cache).
+   *
+   * This replaces the earlier `getCurrentUserId()` primitive: any code that
+   * needs the current user's id should read `.userId` from the returned claims.
+   */
+  getCurrentAuthClaims(): Promise<AuthIdentityClaims | null>;
 }

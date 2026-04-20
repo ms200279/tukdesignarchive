@@ -67,6 +67,18 @@ export type SessionWithProfile = {
   profile: Profile;
 };
 
+/**
+ * Lightweight identity derived from a locally-verified JWT. Safe to use for
+ * UX redirects and owner-scoped queries; actual data authorization stays in
+ * Postgres RLS.
+ */
+export type AuthIdentity = {
+  userId: string;
+  role: UserRole;
+  student_id: string | null;
+  display_name: string | null;
+};
+
 /** 학생 대시보드 작품 한 줄. */
 export type StudentWorkListItem = Pick<
   Work,

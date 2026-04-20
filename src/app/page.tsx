@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionProfile } from "@/lib/auth/session";
-import { isProfessorSession, isStudentSession } from "@/lib/auth/role-guards";
+import {
+  getAuthIdentity,
+  isProfessorIdentity,
+  isStudentIdentity,
+} from "@/lib/auth/session";
 
 export default async function HomePage() {
-  const session = await getSessionProfile();
-  if (isStudentSession(session)) {
+  const identity = await getAuthIdentity();
+  if (isStudentIdentity(identity)) {
     redirect("/student");
   }
-  if (isProfessorSession(session)) {
+  if (isProfessorIdentity(identity)) {
     redirect("/professor");
   }
 

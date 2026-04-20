@@ -1,20 +1,19 @@
 "use server";
 
-import { getSessionProfile } from "@/lib/auth/session";
-import { isStudentSession } from "@/lib/auth/role-guards";
+import { getAuthIdentity, isStudentIdentity } from "@/lib/auth/session";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { workFileStorage } from "@/lib/storage/storage-instances";
 import { worksRepository, workFilesRepository } from "@/repositories";
 
 export async function createWork() {
-  const session = await getSessionProfile();
-  if (!isStudentSession(session)) {
+  const identity = await getAuthIdentity();
+  if (!isStudentIdentity(identity)) {
     redirect("/login/student");
   }
 
   const result = await worksRepository.insertWorkForOwner({
-    ownerId: session.userId,
+    ownerId: identity.userId,
     title: "새 작품",
   });
 
@@ -32,14 +31,14 @@ export async function updateWorkMetadata(formData: FormData) {
   const description = String(formData.get("description") ?? "").trim();
   const yearRaw = String(formData.get("exhibition_year") ?? "").trim();
 
-  const session = await getSessionProfile();
-  if (!isStudentSession(session) || !workId) {
+  const identity = await getAuthIdentity();
+  if (!isStudentIdentity(identity) || !workId) {
     redirect("/student");
   }
 
   const exhibition_year = yearRaw ? Number.parseInt(yearRaw, 10) : null;
   const { error } = await worksRepository.updateWorkMetadataForOwner({
-    ownerId: session.userId,
+    ownerId: identity.userId,
     workId,
     title: title || "제목 없음",
     description: description || null,
@@ -61,13 +60,13 @@ export async function updateWorkMetadata(formData: FormData) {
 export async function deleteWork(formData: FormData) {
   const workId = String(formData.get("workId") ?? "").trim();
 
-  const session = await getSessionProfile();
-  if (!isStudentSession(session) || !workId) {
+  const identity = await getAuthIdentity();
+  if (!isStudentIdentity(identity) || !workId) {
     redirect("/student?error=delete");
   }
 
   const { work, error: loadErr } = await worksRepository.getOwnedWorkById({
-    ownerId: session.userId,
+    ownerId: identity.userId,
     workId,
   });
   if (loadErr || !work) {
@@ -90,7 +89,7 @@ export async function deleteWork(formData: FormData) {
   }
 
   const { error: delErr } = await worksRepository.deleteWorkForOwner({
-    ownerId: session.userId,
+    ownerId: identity.userId,
     workId,
   });
   if (delErr) {

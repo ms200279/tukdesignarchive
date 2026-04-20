@@ -1,7 +1,6 @@
 "use server";
 
-import { getSessionProfile } from "@/lib/auth/session";
-import { isStudentSession } from "@/lib/auth/role-guards";
+import { getAuthIdentity, isStudentIdentity } from "@/lib/auth/session";
 import {
   coverPreviewSignedUrlTtlSeconds,
   workFileDownloadSignedUrlTtlSeconds,
@@ -14,8 +13,8 @@ export async function signedUrlForWorkFileAsset(
   ref: StoredObjectRef,
   expiresInSeconds?: number,
 ): Promise<{ signedUrl: string } | { error: string }> {
-  const session = await getSessionProfile();
-  if (!session) {
+  const identity = await getAuthIdentity();
+  if (!identity) {
     return { error: "로그인이 필요합니다." };
   }
 
@@ -40,14 +39,14 @@ export async function signedUrlForCoverPreview(
 export async function assignCoverSeriesForWork(
   workId: string,
 ): Promise<{ seriesId: string } | { error: string }> {
-  const session = await getSessionProfile();
-  if (!isStudentSession(session)) {
+  const identity = await getAuthIdentity();
+  if (!isStudentIdentity(identity)) {
     return { error: "권한이 없습니다." };
   }
 
   const seriesId = crypto.randomUUID();
   const { error } = await worksRepository.updateCoverSeriesIdForOwner({
-    ownerId: session.userId,
+    ownerId: identity.userId,
     workId,
     coverSeriesId: seriesId,
   });
@@ -63,8 +62,8 @@ export async function uploadWorkFileVersion(
   seriesId: string,
   formData: FormData,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const session = await getSessionProfile();
-  if (!isStudentSession(session)) {
+  const identity = await getAuthIdentity();
+  if (!isStudentIdentity(identity)) {
     return { ok: false, message: "권한이 없습니다." };
   }
 
@@ -73,7 +72,7 @@ export async function uploadWorkFileVersion(
     return { ok: false, message: "파일이 없습니다." };
   }
 
-  const userId = session.userId;
+  const userId = identity.userId;
   const bucket = workFileStorage.defaultBucket();
   const assetClass = workFileStorage.assetClassForPipelineKind(kind);
 
@@ -143,8 +142,8 @@ export async function uploadLegacyOriginalWorkFile(
   workId: string,
   formData: FormData,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const session = await getSessionProfile();
-  if (!isStudentSession(session)) {
+  const identity = await getAuthIdentity();
+  if (!isStudentIdentity(identity)) {
     return { ok: false, message: "권한이 없습니다." };
   }
 
@@ -153,7 +152,7 @@ export async function uploadLegacyOriginalWorkFile(
     return { ok: false, message: "파일이 없습니다." };
   }
 
-  const userId = session.userId;
+  const userId = identity.userId;
   const uniqueId = crypto.randomUUID();
   const bucket = workFileStorage.defaultBucket();
   const path = workFileStorage.buildLegacyOriginalObjectPath({

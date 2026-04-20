@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSessionProfile } from "@/lib/auth/session";
+import { getAuthIdentity } from "@/lib/auth/session";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 
 export default async function DashboardLayout({
@@ -7,10 +7,10 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSessionProfile();
-  if (!session) {
+  const identity = await getAuthIdentity();
+  if (!identity) {
     redirect("/");
   }
 
-  return <DashboardShell profile={session.profile}>{children}</DashboardShell>;
+  return <DashboardShell identity={identity}>{children}</DashboardShell>;
 }

@@ -1,17 +1,16 @@
 import { redirect } from "next/navigation";
-import { getSessionProfile } from "@/lib/auth/session";
-import { isProfessorSession } from "@/lib/auth/role-guards";
+import { getAuthIdentity, isProfessorIdentity } from "@/lib/auth/session";
 
 export default async function ProfessorSectionLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSessionProfile();
-  if (!session) {
+  const identity = await getAuthIdentity();
+  if (!identity) {
     redirect("/");
   }
-  if (!isProfessorSession(session)) {
+  if (!isProfessorIdentity(identity)) {
     redirect("/student");
   }
   return children;

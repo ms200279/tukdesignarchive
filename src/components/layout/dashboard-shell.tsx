@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
-import { profileHasRole } from "@/lib/auth/role-guards";
-import type { Profile } from "@/types/domain";
+import type { AuthIdentity } from "@/types/domain";
 
 const navStudent = [
   { href: "/student", label: "내 작품" },
@@ -10,16 +9,22 @@ const navStudent = [
 
 const navProfessor = [{ href: "/professor", label: "전체 작품" }];
 
+type DashboardShellIdentity = Pick<
+  AuthIdentity,
+  "role" | "display_name" | "student_id"
+>;
+
 export function DashboardShell({
-  profile,
+  identity,
   children,
 }: {
-  profile: Profile;
+  identity: DashboardShellIdentity;
   children: React.ReactNode;
 }) {
-  const nav = profileHasRole(profile, "student") ? navStudent : navProfessor;
-  const badge = profileHasRole(profile, "student")
-    ? `학생 · ${profile.student_id ?? "학번 미등록"}`
+  const isStudent = identity.role === "student";
+  const nav = isStudent ? navStudent : navProfessor;
+  const badge = isStudent
+    ? `학생 · ${identity.student_id ?? "학번 미등록"}`
     : "교수";
 
   return (
@@ -45,7 +50,7 @@ export function DashboardShell({
         <div className="border-t border-slate-200 p-3">
           <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
             <div className="font-medium text-slate-800">
-              {profile.display_name ?? "이름 없음"}
+              {identity.display_name ?? "이름 없음"}
             </div>
             <div className="mt-0.5 text-slate-500">{badge}</div>
           </div>
