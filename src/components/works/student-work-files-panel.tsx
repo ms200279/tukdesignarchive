@@ -10,16 +10,25 @@ import {
 } from "@/lib/uploads/limits";
 import {
   assignCoverSeriesForWork,
+  commitWorkFileVersion,
+  reserveWorkFileVersion,
+  rollbackWorkFileVersion,
   signedUrlForCoverPreview,
-  uploadWorkFileVersion,
 } from "@/lib/storage/work-file-server-actions";
-import type { StoredObjectRef, WorkFile } from "@/types/domain";
+import { getBrowserSupabaseClient } from "@/lib/db/browser";
+import type { StoredObjectRef, WorkFile, WorkFileKind } from "@/types/domain";
 import { WorkFileDownload } from "@/components/works/work-file-download";
 
 type FileSeriesGroup = {
   seriesId: string;
   kind: "cover" | "original";
   versions: WorkFile[];
+};
+
+type UploadProgress = {
+  label: string;
+  current: number;
+  total: number;
 };
 
 function groupFiles(files: WorkFile[]): FileSeriesGroup[] {
@@ -90,6 +99,7 @@ export function StudentWorkFilesPanel({
     text: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [coverSeriesId, setCoverSeriesId] = useState<string | null>(
     initialCoverSeriesId,
   );
@@ -111,18 +121,84 @@ export function StudentWorkFilesPanel({
     setFeedback({ tone, text });
   }, []);
 
+  /**
+   * 업로드 3단계 (reserve → browser upload → commit).
+   *
+   * 파일 자체는 Server Action을 거치지 않고 브라우저에서 Supabase Storage로
+   * 바로 올라간다. Server Action은 버전 예약(JSON ≈ 1KB)과 DB 메타 커밋만
+   * 담당하므로 Vercel 함수 body 4.5MB 캡을 받지 않는다.
+   *
+   * 업로드 중 어느 단계에서든 실패하면 rollback을 호출해 예약된 버전을
+   * 되돌리고 Storage 객체를 청소한다.
+   */
   const uploadNewVersion = useCallback(
     async (
       file: File,
-      kind: "cover" | "original",
+      kind: WorkFileKind,
       seriesId: string,
     ): Promise<string | null> => {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await uploadWorkFileVersion(workId, kind, seriesId, fd);
-      if (!res.ok) {
-        return res.message;
+      const reservation = await reserveWorkFileVersion({
+        workId,
+        kind,
+        seriesId,
+        originalFilename: file.name,
+      });
+      if (!reservation.ok) {
+        return reservation.message;
       }
+      const { bucket, path, version } = reservation;
+
+      let uploadErrorMessage: string | null = null;
+      try {
+        const supabase = getBrowserSupabaseClient();
+        const { error } = await supabase.storage
+          .from(bucket)
+          .upload(path, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type || undefined,
+          });
+        if (error) {
+          uploadErrorMessage = error.message || "업로드에 실패했습니다.";
+        }
+      } catch (e) {
+        uploadErrorMessage =
+          e instanceof Error ? e.message : "업로드에 실패했습니다.";
+      }
+
+      if (uploadErrorMessage) {
+        await rollbackWorkFileVersion({
+          workId,
+          kind,
+          seriesId,
+          version,
+          originalFilename: file.name,
+        });
+        return uploadErrorMessage;
+      }
+
+      const commit = await commitWorkFileVersion({
+        workId,
+        kind,
+        seriesId,
+        version,
+        originalFilename: file.name,
+        contentType: file.type || null,
+        byteSize: file.size,
+        bucket,
+        path,
+      });
+      if (!commit.ok) {
+        await rollbackWorkFileVersion({
+          workId,
+          kind,
+          seriesId,
+          version,
+          originalFilename: file.name,
+        });
+        return commit.message;
+      }
+
       return null;
     },
     [workId],
@@ -137,12 +213,14 @@ export function StudentWorkFilesPanel({
       }
       setBusy(true);
       setFeedback(null);
+      setProgress({ label: file.name, current: 1, total: 1 });
 
       let sid = coverSeriesId;
       if (!sid) {
         const assign = await assignCoverSeriesForWork(workId);
         if ("error" in assign) {
           setBusy(false);
+          setProgress(null);
           pushFeedback("err", assign.error);
           return;
         }
@@ -152,11 +230,15 @@ export function StudentWorkFilesPanel({
 
       const err = await uploadNewVersion(file, "cover", sid);
       setBusy(false);
+      setProgress(null);
       if (err) {
         pushFeedback("err", err);
         return;
       }
-      pushFeedback("ok", "대표 이미지가 새 버전으로 저장되었습니다. 이전 버전은 보관됩니다.");
+      pushFeedback(
+        "ok",
+        "대표 이미지가 새 버전으로 저장되었습니다. 이전 버전은 보관됩니다.",
+      );
       router.refresh();
     },
     [coverSeriesId, pushFeedback, router, uploadNewVersion, workId],
@@ -171,14 +253,19 @@ export function StudentWorkFilesPanel({
       }
       setBusy(true);
       setFeedback(null);
+      setProgress({ label: file.name, current: 1, total: 1 });
       const err = await uploadNewVersion(file, "original", seriesId);
       setBusy(false);
+      setProgress(null);
       setTargetSeriesForVersion(null);
       if (err) {
         pushFeedback("err", err);
         return;
       }
-      pushFeedback("ok", "새 버전이 추가되었습니다. 이전 파일은 그대로 보관됩니다.");
+      pushFeedback(
+        "ok",
+        "새 버전이 추가되었습니다. 이전 파일은 그대로 보관됩니다.",
+      );
       router.refresh();
     },
     [pushFeedback, router, uploadNewVersion],
@@ -186,7 +273,28 @@ export function StudentWorkFilesPanel({
 
   return (
     <div className="space-y-8">
-      {feedback ? (
+      {progress ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900"
+        >
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 animate-ping rounded-full bg-sky-500"
+            />
+            <span className="font-medium">
+              업로드 중 ({progress.current}/{progress.total})
+            </span>
+            <span className="truncate text-sky-800">{progress.label}</span>
+          </div>
+          <p className="mt-1 text-xs text-sky-700">
+            창을 닫지 말고 잠시만 기다려 주세요. 용량이 큰 파일은 몇 분이 걸릴 수
+            있습니다.
+          </p>
+        </div>
+      ) : feedback ? (
         <div
           role="status"
           className={
@@ -281,7 +389,15 @@ export function StudentWorkFilesPanel({
                   const failed: string[] = [];
                   let ok = 0;
                   setBusy(true);
-                  for (const f of selected) {
+                  setFeedback(null);
+                  const total = selected.length;
+                  for (let i = 0; i < selected.length; i += 1) {
+                    const f = selected[i];
+                    setProgress({
+                      label: f.name,
+                      current: i + 1,
+                      total,
+                    });
                     const v = validateOriginalFile(f);
                     if (v) {
                       failed.push(v);
@@ -296,6 +412,7 @@ export function StudentWorkFilesPanel({
                     else ok += 1;
                   }
                   setBusy(false);
+                  setProgress(null);
                   e.target.value = "";
                   if (failed.length && ok === 0) {
                     pushFeedback("err", failed.slice(0, 4).join(" · "));
