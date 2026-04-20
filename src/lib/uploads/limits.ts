@@ -54,7 +54,7 @@ function fileExt(name: string) {
   return name.slice(i + 1).toLowerCase();
 }
 
-export function formatMaxBytes(n: number) {
+function formatMaxBytes(n: number) {
   if (n >= 1024 * 1024) return `${Math.round(n / (1024 * 1024))}MB`;
   if (n >= 1024) return `${Math.round(n / 1024)}KB`;
   return `${n}B`;

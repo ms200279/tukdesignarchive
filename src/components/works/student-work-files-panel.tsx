@@ -16,7 +16,7 @@ import {
 import type { StoredObjectRef, WorkFile } from "@/types/domain";
 import { WorkFileDownload } from "@/components/works/work-file-download";
 
-export type FileSeriesGroup = {
+type FileSeriesGroup = {
   seriesId: string;
   kind: "cover" | "original";
   versions: WorkFile[];

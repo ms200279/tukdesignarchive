@@ -1,6 +1,6 @@
 export type WorkStatusTone = "neutral" | "warning" | "success";
 
-export type WorkStatus = {
+type WorkStatus = {
   label: string;
   tone: WorkStatusTone;
 };

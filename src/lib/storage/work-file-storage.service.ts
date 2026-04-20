@@ -1,7 +1,6 @@
 import { workFilesBucket } from "@/config";
 import type { ObjectStoragePort } from "@/lib/storage/ports/object-storage.port";
 import {
-  buildLegacyFlatOriginalStoragePath,
   buildVersionedWorkFileStoragePath,
   sanitizeWorkFilename,
 } from "@/lib/storage/paths";
@@ -48,36 +47,6 @@ export class WorkFileStorageService {
       version: params.version,
       safeName: safe,
     });
-  }
-
-  buildLegacyOriginalObjectPath(params: {
-    userId: string;
-    workId: string;
-    uniqueId: string;
-    originalFilename: string;
-    maxSafeNameLength: number;
-  }): string {
-    const safe = sanitizeWorkFilename(
-      params.originalFilename,
-      params.maxSafeNameLength,
-    );
-    return buildLegacyFlatOriginalStoragePath({
-      userId: params.userId,
-      workId: params.workId,
-      uniqueId: params.uniqueId,
-      safeName: safe,
-    });
-  }
-
-  /** 향후 썸네일 파생본 전용 경로 (현재 업로드 경로와 분리). */
-  buildThumbnailObjectPath(params: {
-    userId: string;
-    workId: string;
-    seriesId: string;
-    version: number;
-    safeName: string;
-  }): string {
-    return `${params.userId}/${params.workId}/thumbnail/${params.seriesId}/v${params.version}_${params.safeName}`;
   }
 
   ref(bucket: string, path: string): StoredObjectRef {

@@ -21,13 +21,3 @@ export function buildVersionedWorkFileStoragePath(params: {
   const { userId, workId, kind, seriesId, version, safeName } = params;
   return `${userId}/${workId}/${kind}/${seriesId}/v${version}_${safeName}`;
 }
-
-/** Legacy single-segment file id layout used by older upload UI. */
-export function buildLegacyFlatOriginalStoragePath(params: {
-  userId: string;
-  workId: string;
-  uniqueId: string;
-  safeName: string;
-}) {
-  return `${params.userId}/${params.workId}/${params.uniqueId}_${params.safeName}`;
-}

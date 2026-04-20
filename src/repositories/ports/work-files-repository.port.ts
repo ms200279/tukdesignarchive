@@ -36,16 +36,6 @@ export interface WorkFilesRepository {
     is_latest: boolean;
   }): Promise<{ error: string | null }>;
 
-  insertLegacyOriginalRow(params: {
-    work_id: string;
-    storage_bucket: string;
-    storage_path: string;
-    asset_class: StorageAssetClass;
-    original_name: string;
-    content_type: string | null;
-    byte_size: number;
-  }): Promise<{ error: string | null }>;
-
   countLatestFilesByWorkIds(
     workIds: string[],
   ): Promise<Record<string, number>>;

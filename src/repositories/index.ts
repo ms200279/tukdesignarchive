@@ -5,10 +5,6 @@ import type { UsersRepository } from "@/repositories/ports/users-repository.port
 import type { WorkFilesRepository } from "@/repositories/ports/work-files-repository.port";
 import type { WorksRepository } from "@/repositories/ports/works-repository.port";
 
-export type { UsersRepository } from "@/repositories/ports/users-repository.port";
-export type { WorkFilesRepository } from "@/repositories/ports/work-files-repository.port";
-export type { WorksRepository } from "@/repositories/ports/works-repository.port";
-
 /** Composition root: swap implementations for migration. */
 export const usersRepository: UsersRepository = new SupabaseUsersRepository();
 export const worksRepository: WorksRepository = new SupabaseWorksRepository();

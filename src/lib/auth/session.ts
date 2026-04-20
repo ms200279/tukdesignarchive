@@ -22,7 +22,7 @@ export async function getAuthIdentity(): Promise<AuthIdentity | null> {
   return getAuthIdentityCached();
 }
 
-export function identityHasRole<R extends UserRole>(
+function identityHasRole<R extends UserRole>(
   identity: AuthIdentity | null,
   role: R,
 ): identity is AuthIdentity & { role: R } {

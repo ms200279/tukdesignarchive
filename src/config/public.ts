@@ -5,10 +5,7 @@ import {
   DEFAULT_WORK_FILE_DOWNLOAD_SIGNED_URL_TTL_SEC,
   DEFAULT_WORK_FILES_BUCKET_ID,
 } from "@/config/defaults";
-import type {
-  PublicAppConfig,
-  PublicSupabaseClientConfig,
-} from "@/config/types";
+import type { PublicSupabaseClientConfig } from "@/config/types";
 
 function trimEnv(name: string): string | undefined {
   const v = process.env[name];
@@ -25,7 +22,7 @@ function readPositiveIntEnv(name: string, fallback: number): number {
 }
 
 /** Returns null if URL or anon key missing (e.g. middleware no-op). */
-export function tryGetPublicSupabaseClientConfig(): PublicSupabaseClientConfig | null {
+function tryGetPublicSupabaseClientConfig(): PublicSupabaseClientConfig | null {
   const supabaseUrl = trimEnv("NEXT_PUBLIC_SUPABASE_URL");
   const supabaseAnonKey = trimEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!supabaseUrl || !supabaseAnonKey) return null;
@@ -46,7 +43,6 @@ export function requirePublicSupabaseClientConfig(): PublicSupabaseClientConfig 
   return c;
 }
 
-/** Legacy helpers — prefer `tryGetPublicSupabaseClientConfig` for new code. */
 export function getPublicSupabaseUrl(): string | undefined {
   return tryGetPublicSupabaseClientConfig()?.supabaseUrl;
 }
@@ -82,18 +78,4 @@ export function workFileDownloadSignedUrlTtlSeconds(): number {
     "NEXT_PUBLIC_WORK_FILE_DOWNLOAD_SIGNED_URL_TTL_SEC",
     DEFAULT_WORK_FILE_DOWNLOAD_SIGNED_URL_TTL_SEC,
   );
-}
-
-/** Single object for server layout / debugging (still public-only fields). */
-export function getPublicAppConfig(): PublicAppConfig {
-  const sb = tryGetPublicSupabaseClientConfig();
-  return {
-    supabaseUrl: sb?.supabaseUrl ?? "",
-    supabaseAnonKey: sb?.supabaseAnonKey ?? "",
-    workFilesBucketId: workFilesBucket(),
-    studentEmailDomain: studentEmailDomain(),
-    professorEmailDomain: professorEmailDomain(),
-    coverPreviewSignedUrlTtlSeconds: coverPreviewSignedUrlTtlSeconds(),
-    workFileDownloadSignedUrlTtlSeconds: workFileDownloadSignedUrlTtlSeconds(),
-  };
 }

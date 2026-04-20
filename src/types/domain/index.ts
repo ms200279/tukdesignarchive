@@ -47,26 +47,6 @@ export type WorkFile = {
   is_latest: boolean;
 };
 
-export type WorkWithOwner = Work & {
-  owner: Pick<Profile, "display_name" | "student_id"> | null;
-};
-
-export type StudentRegistry = {
-  id: number;
-  profile_id: string;
-  student_id: string;
-  created_at: string;
-};
-
-/** @deprecated use `StoredObjectRef` */
-export type WorkFileStorageRef = StoredObjectRef;
-
-/** Authenticated user + app profile (provider-agnostic). */
-export type SessionWithProfile = {
-  userId: string;
-  profile: Profile;
-};
-
 /**
  * Lightweight identity derived from a locally-verified JWT. Safe to use for
  * UX redirects and owner-scoped queries; actual data authorization stays in

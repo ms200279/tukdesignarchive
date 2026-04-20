@@ -3,7 +3,7 @@
  * Supabase Auth (or any IdP) lives only in the adapter implementation.
  */
 
-export type AuthErrorLike = {
+type AuthErrorLike = {
   message?: string;
   code?: string;
   status?: number;

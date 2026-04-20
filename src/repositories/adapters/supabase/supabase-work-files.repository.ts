@@ -135,30 +135,6 @@ export class SupabaseWorkFilesRepository implements WorkFilesRepository {
     return { error: error?.message ?? null };
   }
 
-  async insertLegacyOriginalRow(params: {
-    work_id: string;
-    storage_bucket: string;
-    storage_path: string;
-    asset_class: StorageAssetClass;
-    original_name: string;
-    content_type: string | null;
-    byte_size: number;
-  }): Promise<{ error: string | null }> {
-    const db = await createServerSupabaseClient();
-    const { error } = await db.from("work_files").insert({
-      work_id: params.work_id,
-      storage_bucket: params.storage_bucket,
-      storage_path: params.storage_path,
-      asset_class: params.asset_class,
-      original_name: params.original_name,
-      content_type: params.content_type,
-      byte_size: params.byte_size,
-      kind: "original",
-    });
-
-    return { error: error?.message ?? null };
-  }
-
   async countLatestFilesByWorkIds(
     workIds: string[],
   ): Promise<Record<string, number>> {
